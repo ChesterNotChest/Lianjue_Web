@@ -113,7 +113,7 @@ function parseMaterialDetailResponse(response) {
 }
 
 function parseMaterialDraftResponse(response) {
-  return response?.material ?? null;
+  return response?.material_draft ?? null;
 }
 
 function parseSyllabusMutationResponse(response) {
@@ -254,7 +254,7 @@ export async function listMaterialsRaw(syllabusId) {
 }
 
 export async function getMaterialDraftDetailRaw(materialId) {
-  return cloneData(mockMaterialDraftDetailResponseById[materialId] ?? { success: true, material: null });
+  return cloneData(mockMaterialDraftDetailResponseById[materialId] ?? { success: true, material_draft: null });
 }
 
 export async function getMaterialDetailRaw(materialId) {
@@ -488,7 +488,7 @@ export async function updateMaterialDraft(payload = {}) {
 
   mockMaterialDraftDetailResponseById[materialId] = {
     success: true,
-    material: cloneData(materialDraftJson),
+    material_draft: cloneData(materialDraftJson),
     error_message: '',
     error_code: '',
   };
