@@ -39,6 +39,9 @@ let mockSyllabusDetailResponseById = cloneData(RAW_GET_SYLLABUS_DETAIL_INFO_RESP
 let mockSyllabusDraftDetailResponseById = cloneData(RAW_GET_SYLLABUS_DRAFT_DETAIL_INFO_RESPONSE_BY_SYLLABUS_ID_FOR_USER_7_MANAGE_VIEW);
 let mockMaterialDetailResponseById = cloneData(RAW_GET_MATERIAL_DETAIL_INFO_RESPONSE_BY_MATERIAL_ID);
 let mockMaterialDraftDetailResponseById = cloneData(RAW_GET_MATERIAL_DRAFT_DETAIL_INFO_RESPONSE_BY_MATERIAL_ID);
+const teacherVisibleInflight = new Map();
+const teacherBuildInflight = new Map();
+const teacherMaterialInflight = new Map();
 
 function updateManageSyllabusTitle(syllabusId, title) {
   const rows = RAW_LIST_ALL_SYLLABUSES_BRIEF_INFO_FOR_MANAGE_RESPONSE_FOR_USER_7?.syllabuses ?? [];
@@ -235,6 +238,126 @@ function mapMaterialShelf(syllabusFiles, graphFiles) {
   return [...syllabusItems, ...graphFiles];
 }
 
+function createTeacherSyllabusBaseItem(item) {
+  return {
+    syllabusId: item.syllabusId,
+    title: item.title,
+    permission: item.permission,
+    graphId: item.graphId,
+    graphName: item.graphName,
+    dayOneTime: item.dayOneTime,
+    eduCalendarPath: item.eduCalendarPath ?? null,
+    draftPath: item.draftPath ?? null,
+    finalPath: item.finalPath ?? null,
+    status: {
+      isEduCalendarMissing: !item.eduCalendarPath,
+      isDraftMissing: !item.draftPath,
+      isFinalMissing: !item.finalPath,
+    },
+    draft: null,
+    finalData: null,
+    graphFiles: [],
+    graphFileCount: 0,
+    syllabusFiles: [],
+    materialDrafts: [],
+    materialShelf: [],
+    isVisibleLoaded: false,
+    isBuildLoaded: false,
+    isMaterialDetailsLoaded: false,
+  };
+}
+
+function normalizeTeacherSyllabusItem(item) {
+  const base = createTeacherSyllabusBaseItem(item);
+
+  return {
+    ...base,
+    ...item,
+    status: item?.status ?? base.status,
+    graphFiles: item?.graphFiles ?? base.graphFiles,
+    materialDrafts: item?.materialDrafts ?? base.materialDrafts,
+    syllabusFiles: item?.syllabusFiles ?? base.syllabusFiles,
+    materialShelf: item?.materialShelf ?? base.materialShelf,
+  };
+}
+
+async function reuseInflight(map, key, factory) {
+  if (map.has(key)) {
+    return map.get(key);
+  }
+
+  const promise = (async () => factory())().finally(() => {
+    map.delete(key);
+  });
+  map.set(key, promise);
+  return promise;
+}
+
+async function buildTeacherSyllabusVisibleData(item) {
+  const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
+  const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
+  const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
+  const jobs = item.graphId ? await listJobs(item.graphId) : [];
+  const graphFiles = mapGraphFiles(rawGraphFiles, jobs);
+  const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
+  const materialStatuses = await Promise.all(
+    materialList.map(async (material) => parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId))),
+  );
+  const materialDrafts = materialList.map((material, index) => ({
+    ...material,
+    draft: null,
+    finalData: null,
+    status: materialStatuses[index],
+  }));
+
+  return {
+    title: finalData?.title ?? item.title,
+    graphName: finalData?.graph_name ?? item.graphName,
+    status,
+    finalData,
+    graphFiles,
+    graphFileCount: rawGraphFiles.length,
+    materialDrafts,
+    materialShelf: mapMaterialShelf([], graphFiles),
+    isVisibleLoaded: true,
+  };
+}
+
+async function buildTeacherSyllabusBuildData(item) {
+  const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
+  const draft = item.draftPath ? parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(item.syllabusId)) : null;
+  const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
+
+  return {
+    title: finalData?.title ?? draft?.title ?? item.title,
+    graphName: finalData?.graph_name ?? draft?.graph_name ?? item.graphName,
+    status,
+    draft,
+    finalData,
+    isBuildLoaded: true,
+  };
+}
+
+async function buildTeacherSyllabusMaterialDetails(item) {
+  const syllabusFiles = await listSyllabusFiles([item.syllabusId]);
+  const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
+  const materialDrafts = await Promise.all(
+    materialList.map(async (material) => ({
+      ...material,
+      draft: parseMaterialDraftResponse(await getMaterialDraftDetailRaw(material.materialId)),
+      finalData: material.finalPath ? parseMaterialDetailResponse(await getMaterialDetailRaw(material.materialId)) : null,
+      status: parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId)),
+    })),
+  );
+
+  return {
+    syllabusFiles,
+    materialDrafts,
+    materialShelf: mapMaterialShelf(syllabusFiles, item.graphFiles ?? []),
+    isMaterialDetailsLoaded: true,
+  };
+}
+
 export async function listSyllabusesRaw(payload = {}) {
   const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
   if (!USE_MOCK_API) {
@@ -308,48 +431,58 @@ export async function getMaterialStatusRaw(materialId) {
 }
 
 export async function getTeacherDashboardData() {
-  const syllabusList = parseSyllabusListResponse(await listSyllabusesRaw());
+  const bootstrap = await getTeacherDashboardBootstrapData();
 
   const syllabuses = await Promise.all(
-    syllabusList.map(async (item) => {
-      const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
-      const draft = item.draftPath ? parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(item.syllabusId)) : null;
-      const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
-      const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
-      const jobs = item.graphId ? await listJobs(item.graphId) : [];
-      const graphFiles = mapGraphFiles(rawGraphFiles, jobs);
-      const syllabusFiles = await listSyllabusFiles([item.syllabusId]);
-      const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
-
-      const materialDrafts = await Promise.all(
-        materialList.map(async (material) => ({
-          ...material,
-          draft: parseMaterialDraftResponse(await getMaterialDraftDetailRaw(material.materialId)),
-          finalData: material.finalPath ? parseMaterialDetailResponse(await getMaterialDetailRaw(material.materialId)) : null,
-          status: parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId)),
-        })),
-      );
+    bootstrap.syllabuses.map(async (item) => {
+      const visibleData = await getTeacherSyllabusVisibleData(item);
+      const buildData = await getTeacherSyllabusBuildData({ ...item, ...visibleData });
+      const materialData = await getTeacherSyllabusMaterialDetails({ ...item, ...visibleData, ...buildData });
 
       return {
-        syllabusId: item.syllabusId,
-        title: finalData?.title ?? draft?.title ?? item.title,
-        permission: item.permission,
-        graphId: item.graphId,
-        graphName: finalData?.graph_name ?? item.graphName,
-        dayOneTime: item.dayOneTime,
-        status,
-        draft,
-        finalData,
-        graphFiles,
-        graphFileCount: rawGraphFiles.length,
-        syllabusFiles,
-        materialDrafts,
-        materialShelf: mapMaterialShelf(syllabusFiles, graphFiles),
+        ...item,
+        ...visibleData,
+        ...buildData,
+        ...materialData,
       };
     }),
   );
 
   return { syllabuses };
+}
+
+export async function getTeacherDashboardBootstrapData() {
+  const syllabusList = parseSyllabusListResponse(await listSyllabusesRaw());
+  return {
+    syllabuses: syllabusList.map(createTeacherSyllabusBaseItem),
+  };
+}
+
+export async function getTeacherSyllabusVisibleData(syllabus) {
+  const normalized = normalizeTeacherSyllabusItem(syllabus);
+  return reuseInflight(
+    teacherVisibleInflight,
+    normalized.syllabusId,
+    () => buildTeacherSyllabusVisibleData(normalized),
+  );
+}
+
+export async function getTeacherSyllabusBuildData(syllabus) {
+  const normalized = normalizeTeacherSyllabusItem(syllabus);
+  return reuseInflight(
+    teacherBuildInflight,
+    normalized.syllabusId,
+    () => buildTeacherSyllabusBuildData(normalized),
+  );
+}
+
+export async function getTeacherSyllabusMaterialDetails(syllabus) {
+  const normalized = normalizeTeacherSyllabusItem(syllabus);
+  return reuseInflight(
+    teacherMaterialInflight,
+    normalized.syllabusId,
+    () => buildTeacherSyllabusMaterialDetails(normalized),
+  );
 }
 
 export async function listGraphsRaw() {

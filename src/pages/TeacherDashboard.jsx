@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import MainLayout from '../layouts/MainLayout';
 import {
   Button,
   DisabledBlock,
   EmptyState,
+  LoadingPlaceholder,
   MaterialShelf,
   ModalShell,
   StatusPill,
@@ -17,9 +18,12 @@ import {
   createGraph,
   generateFinalMaterial,
   generateMaterialDraft,
+  getTeacherDashboardBootstrapData,
+  getTeacherSyllabusBuildData,
+  getTeacherSyllabusMaterialDetails,
+  getTeacherSyllabusVisibleData,
   getMaterialDraftDetailRaw,
   getMaterialStatusRaw,
-  getTeacherDashboardData,
   listGraphs,
   parseMaterialDraftResponse,
   parseMaterialStatusResponse,
@@ -218,6 +222,24 @@ function createMaterialState(active) {
     draftQuestions: cloneData(selected?.draft?.questions ?? []),
     finalQuestions: cloneData(selected?.finalData?.questions ?? []).map(hydrateFinalQuestion),
     publish: { new_pdf: true, do_publish: false },
+  };
+}
+
+function mergeSyllabusData(source, patch) {
+  return {
+    ...source,
+    ...patch,
+    status: patch.status ?? source.status,
+    draft: patch.draft ?? source.draft,
+    finalData: patch.finalData ?? source.finalData,
+    graphFiles: patch.graphFiles ?? source.graphFiles,
+    graphFileCount: patch.graphFileCount ?? source.graphFileCount,
+    syllabusFiles: patch.syllabusFiles ?? source.syllabusFiles,
+    materialDrafts: patch.materialDrafts ?? source.materialDrafts,
+    materialShelf: patch.materialShelf ?? source.materialShelf,
+    isVisibleLoaded: patch.isVisibleLoaded ?? source.isVisibleLoaded,
+    isBuildLoaded: patch.isBuildLoaded ?? source.isBuildLoaded,
+    isMaterialDetailsLoaded: patch.isMaterialDetailsLoaded ?? source.isMaterialDetailsLoaded,
   };
 }
 
@@ -946,6 +968,7 @@ export default function TeacherDashboard({ navigate }) {
   const [materialModal, setMaterialModal] = useState({ open: false });
   const [materialUploadFiles, setMaterialUploadFiles] = useState([]);
   const [materialUploadBusy, setMaterialUploadBusy] = useState(false);
+  const [expandedTeacherWeekId, setExpandedTeacherWeekId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -961,11 +984,21 @@ export default function TeacherDashboard({ navigate }) {
       setError('');
 
       try {
-        const [response, graphs] = await Promise.all([getTeacherDashboardData(), listGraphs()]);
+        const [bootstrap, graphs] = await Promise.all([getTeacherDashboardBootstrapData(), listGraphs()]);
+        const firstSyllabusId = bootstrap.syllabuses[0]?.syllabusId ?? null;
+        const firstSyllabus = bootstrap.syllabuses[0] ?? null;
+        const firstVisibleData = firstSyllabus ? await getTeacherSyllabusVisibleData(firstSyllabus) : null;
+
         if (!cancelled) {
-          setSyllabuses(response.syllabuses);
+          setSyllabuses(
+            bootstrap.syllabuses.map((item) => (
+              item.syllabusId === firstSyllabusId && firstVisibleData
+                ? mergeSyllabusData(item, firstVisibleData)
+                : item
+            )),
+          );
           setGraphOptions(graphs);
-          setActiveId(response.syllabuses[0]?.syllabusId ?? null);
+          setActiveId(firstSyllabusId);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -985,6 +1018,70 @@ export default function TeacherDashboard({ navigate }) {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (!activeId) {
+      return undefined;
+    }
+
+    const target = syllabuses.find((item) => item.syllabusId === activeId);
+    if (!target || target.isVisibleLoaded) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function hydrateVisible() {
+      try {
+        const visibleData = await getTeacherSyllabusVisibleData(target);
+        if (cancelled) {
+          return;
+        }
+        patchSyllabusById(activeId, (item) => mergeSyllabusData(item, visibleData));
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : '加载失败');
+        }
+      }
+    }
+
+    hydrateVisible();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, syllabuses]);
+
+  useEffect(() => {
+    if (!activeId) {
+      return undefined;
+    }
+
+    const target = syllabuses.find((item) => item.syllabusId === activeId);
+    if (!target || !target.isVisibleLoaded || target.isMaterialDetailsLoaded) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function hydrateMaterialDetails() {
+      try {
+        const materialData = await getTeacherSyllabusMaterialDetails(target);
+        if (cancelled) {
+          return;
+        }
+        patchSyllabusById(activeId, (item) => mergeSyllabusData(item, materialData));
+      } catch {
+        // Silent hydration should not block the page.
+      }
+    }
+
+    hydrateMaterialDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, syllabuses]);
+
   const active = useMemo(
     () => syllabuses.find((item) => item.syllabusId === activeId) ?? syllabuses[0] ?? null,
     [activeId, syllabuses],
@@ -994,6 +1091,10 @@ export default function TeacherDashboard({ navigate }) {
     () => getCurrentWeekIndex(active?.dayOneTime ?? active?.finalData?.day_one, active?.finalData?.period?.length ?? 0),
     [active?.dayOneTime, active?.finalData?.day_one, active?.finalData?.period],
   );
+
+  useEffect(() => {
+    setExpandedTeacherWeekId(null);
+  }, [activeId]);
   const buildDraftCurrentWeek = useMemo(
     () => getCurrentWeekIndex(buildModal.draftDayOne || buildTarget?.dayOneTime, buildModal.draftPeriod?.length ?? 0),
     [buildModal.draftDayOne, buildModal.draftPeriod, buildTarget?.dayOneTime],
@@ -1010,6 +1111,8 @@ export default function TeacherDashboard({ navigate }) {
     () => getMaterialShelfItems(active?.materialDrafts ?? []),
     [active?.materialDrafts],
   );
+  const showTeacherShell = Boolean(active) || isBooting;
+  const isTeacherVisibleLoading = isBooting || Boolean(active && !active.isVisibleLoaded);
 
   const patchActive = (updater) => {
     setSyllabuses((current) =>
@@ -1021,6 +1124,28 @@ export default function TeacherDashboard({ navigate }) {
     setSyllabuses((current) =>
       current.map((item) => (item.syllabusId === syllabusId ? updater(cloneData(item)) : item)),
     );
+  };
+
+  const ensureBuildData = async (syllabus) => {
+    if (!syllabus?.syllabusId || syllabus.isBuildLoaded) {
+      return syllabus;
+    }
+
+    const buildData = await getTeacherSyllabusBuildData(syllabus);
+    const nextSyllabus = mergeSyllabusData(syllabus, buildData);
+    patchSyllabusById(syllabus.syllabusId, (item) => mergeSyllabusData(item, buildData));
+    return nextSyllabus;
+  };
+
+  const ensureMaterialDetails = async (syllabus) => {
+    if (!syllabus?.syllabusId || syllabus.isMaterialDetailsLoaded) {
+      return syllabus;
+    }
+
+    const materialData = await getTeacherSyllabusMaterialDetails(syllabus);
+    const nextSyllabus = mergeSyllabusData(syllabus, materialData);
+    patchSyllabusById(syllabus.syllabusId, (item) => mergeSyllabusData(item, materialData));
+    return nextSyllabus;
   };
 
   const switchSyllabus = (offset) => {
@@ -1039,11 +1164,7 @@ export default function TeacherDashboard({ navigate }) {
   };
 
   const softRefreshGraphs = async (nextSelectedGraphId = '') => {
-    const [response, graphs] = await Promise.all([getTeacherDashboardData(), listGraphs()]);
-    setSyllabuses((current) => {
-      const localOnly = current.filter((item) => !response.syllabuses.some((row) => row.syllabusId === item.syllabusId));
-      return [...response.syllabuses, ...localOnly];
-    });
+    const graphs = await listGraphs();
     setGraphOptions(graphs);
     const nextGraph = graphs.find((item) => item.graphId === (nextSelectedGraphId || buildModal.selectedGraphId));
     setBuildModal((current) => ({
@@ -1080,7 +1201,7 @@ export default function TeacherDashboard({ navigate }) {
           {error ? <EmptyState>{error}</EmptyState> : null}
           {!error && !active && !isBooting ? <EmptyState>暂无教学大纲。</EmptyState> : null}
 
-          {active ? (
+          {showTeacherShell ? (
             <section className="dashboard-grid dashboard-grid-teacher">
               <article className="tile-card tile-teal tile-span-full">
                 <div className="tile-card-head">
@@ -1089,12 +1210,23 @@ export default function TeacherDashboard({ navigate }) {
                     {weakKnowledge ? '知识来源过少' : '可交互'}
                   </StatusPill>
                 </div>
+                {isTeacherVisibleLoading ? (
+                  <LoadingPlaceholder size="axis" />
+                ) : (
                 <DisabledBlock
                   disabled={overviewDisabled}
                   message={weakKnowledge ? '知识来源过少' : '等待数据加载或教学日历上传'}
                 >
-                  <WeekAxis items={active.finalData?.period ?? []} currentWeek={activeCurrentWeek} />
+                  <WeekAxis
+                    items={active.finalData?.period ?? []}
+                    currentWeek={activeCurrentWeek}
+                    expandedItemId={expandedTeacherWeekId}
+                    onToggleExpand={(itemId) => {
+                      setExpandedTeacherWeekId((current) => (current === itemId ? null : itemId));
+                    }}
+                  />
                 </DisabledBlock>
+                )}
               </article>
 
               <div className="teacher-side-stack">
@@ -1103,15 +1235,28 @@ export default function TeacherDashboard({ navigate }) {
                     <h3>教学大纲</h3>
                     <StatusPill tone={syllabusProgress.tone}>{syllabusProgress.label}</StatusPill>
                   </div>
-                  <DisabledBlock disabled={weakKnowledge} message="知识过少，暂不允许交互">
-                    <div className="tile-actions">
-                      <Button variant="primary" onClick={() => setBuildModal(createBuildState(active, graphOptions))}>
-                        {active.status.isFinalMissing ? '创建教学大纲' : '编辑教学大纲'}
-                      </Button>
-                    </div>
-                  </DisabledBlock>
+                  {isTeacherVisibleLoading ? (
+                    <LoadingPlaceholder size="panel" />
+                  ) : (
+                    <DisabledBlock disabled={weakKnowledge} message="知识过少，暂不允许交互">
+                      <div className="tile-actions">
+                        <Button
+                          variant="primary"
+                          onClick={async () => {
+                            try {
+                              const syllabusForBuild = await ensureBuildData(active);
+                              setBuildModal(createBuildState(syllabusForBuild, graphOptions));
+                            } catch (actionError) {
+                              setError(actionError instanceof Error ? actionError.message : '加载教学大纲详情失败');
+                            }
+                          }}
+                        >
+                          {active.status.isFinalMissing ? '创建教学大纲' : '编辑教学大纲'}
+                        </Button>
+                      </div>
+                    </DisabledBlock>
+                  )}
                 </article>
-
                 <article className="tile-card tile-blue tile-third">
                   <div className="tile-card-head">
                     <h3>教学习题构建</h3>
@@ -1119,93 +1264,115 @@ export default function TeacherDashboard({ navigate }) {
                       {materialDisabled || weakKnowledge ? '不可用' : '可编辑'}
                     </StatusPill>
                   </div>
-                  <DisabledBlock
-                    disabled={materialDisabled || weakKnowledge}
-                    message={weakKnowledge ? '知识来源过少' : '等待数据加载'}
-                  >
-                    <MaterialShelf
-                      items={materialDraftShelfItems}
-                      rows={1}
-                      emptyText="暂无习题文件。"
-                    />
-                    <div className="tile-actions">
-                      <Button variant="primary" onClick={() => setMaterialModal(createMaterialState(active))}>
-                        打开弹窗
-                      </Button>
-                    </div>
-                  </DisabledBlock>
+                  {isTeacherVisibleLoading ? (
+                    <LoadingPlaceholder size="shelf" />
+                  ) : (
+                    <DisabledBlock
+                      disabled={materialDisabled || weakKnowledge}
+                      message={weakKnowledge ? '知识来源过少' : '等待数据加载'}
+                    >
+                      <MaterialShelf
+                        items={materialDraftShelfItems}
+                        rows={2}
+                        emptyText="暂无习题文件。"
+                      />
+                      <div className="tile-actions">
+                        <Button
+                          variant="primary"
+                          onClick={async () => {
+                            try {
+                              const syllabusForMaterial = await ensureMaterialDetails(active);
+                              setMaterialModal(createMaterialState(syllabusForMaterial));
+                            } catch (actionError) {
+                              setError(actionError instanceof Error ? actionError.message : '加载习题详情失败');
+                            }
+                          }}
+                        >
+                          打开弹窗
+                        </Button>
+                      </div>
+                    </DisabledBlock>
+                  )}
                 </article>
               </div>
-
               <article className="tile-card tile-slate tile-two-thirds">
                 <div className="tile-card-head">
                   <h3>教学材料</h3>
                   <StatusPill tone={materialDisabled ? 'warning' : 'success'}>
-                    {`graph-file ${active.graphFiles.length}`}
+                    {`graph-file ${active?.graphFiles?.length ?? 0}`}
                   </StatusPill>
                 </div>
-                <div className="study-mode compact-mode">
-                  <FileDropzone
-                    files={materialUploadFiles}
-                    onFilesChange={setMaterialUploadFiles}
-                    multiple
-                    compact
-                    title="选择教学材料 / dropbox"
-                  />
-                  <div className="tile-actions">
-                    <Button
-                      variant="secondary"
-                      disabled={materialUploadBusy || !materialUploadFiles.length || !active.graphId}
-                      onClick={async () => {
-                        setMaterialUploadBusy(true);
-                        try {
-                          const nextFiles = await Promise.all(
-                            materialUploadFiles.map(async (file) => {
-                              const uploadResponse = await uploadFile({ file });
-                              if (!uploadResponse.success || !uploadResponse.file?.file_id) {
-                                throw new Error(uploadResponse.error_message || '上传教学材料失败');
-                              }
-                              const fileDetail = await getFileDetail(uploadResponse.file.file_id);
-                              if (!fileDetail?.fileId) {
-                                throw new Error('get file detail failed');
-                              }
-                              const jobResponse = await createJob({
-                                graphId: active.graphId,
-                                fileId: uploadResponse.file.file_id,
+                {isTeacherVisibleLoading ? (
+                  <>
+                    <LoadingPlaceholder size="panel" />
+                    <LoadingPlaceholder size="shelf" />
+                  </>
+                ) : (
+                  <>
+                    <div className="study-mode compact-mode">
+                      <FileDropzone
+                        files={materialUploadFiles}
+                        onFilesChange={setMaterialUploadFiles}
+                        multiple
+                        compact
+                        title="选择教学材料 / dropbox"
+                      />
+                      <div className="tile-actions">
+                        <Button
+                          variant="secondary"
+                          disabled={materialUploadBusy || !materialUploadFiles.length || !active.graphId}
+                          onClick={async () => {
+                            setMaterialUploadBusy(true);
+                            try {
+                              const nextFiles = await Promise.all(
+                                materialUploadFiles.map(async (file) => {
+                                  const uploadResponse = await uploadFile({ file });
+                                  if (!uploadResponse.success || !uploadResponse.file?.file_id) {
+                                    throw new Error(uploadResponse.error_message || '上传教学材料失败');
+                                  }
+                                  const fileDetail = await getFileDetail(uploadResponse.file.file_id);
+                                  if (!fileDetail?.fileId) {
+                                    throw new Error('get file detail failed');
+                                  }
+                                  const jobResponse = await createJob({
+                                    graphId: active.graphId,
+                                    fileId: uploadResponse.file.file_id,
+                                  });
+                                  if (!jobResponse.success) {
+                                    throw new Error(jobResponse.errorMessage || '创建解析任务失败');
+                                  }
+                                  return {
+                                    fileId: fileDetail.fileId,
+                                    title: fileDetail.title,
+                                    source: 'graph-file',
+                                    weekLabel: '',
+                                    tagText: 'pending / pdf_to_md',
+                                    tagTone: 'warning',
+                                  };
+                                }),
+                              );
+                              patchActive((item) => {
+                                item.graphFiles = [...nextFiles, ...item.graphFiles];
+                                item.graphFileCount = item.graphFiles.length;
+                                return item;
                               });
-                              if (!jobResponse.success) {
-                                throw new Error(jobResponse.errorMessage || '创建解析任务失败');
-                              }
-                              return {
-                                fileId: fileDetail.fileId,
-                                title: fileDetail.title,
-                                source: 'graph-file',
-                                weekLabel: '',
-                                tagText: 'pending · pdf_to_md',
-                                tagTone: 'warning',
-                              };
-                            }),
-                          );
-                          patchActive((item) => {
-                            item.graphFiles = [...nextFiles, ...item.graphFiles];
-                            item.graphFileCount = item.graphFiles.length;
-                            return item;
-                          });
-                          setMaterialUploadFiles([]);
-                        } catch (actionError) {
-                          setError(actionError instanceof Error ? actionError.message : '上传教学材料失败');
-                        } finally {
-                          setMaterialUploadBusy(false);
-                        }
-                      }}
-                    >
-                      {materialUploadBusy ? '处理中...' : '上传教学材料'}
-                    </Button>
-                  </div>
-                </div>
-                <DisabledBlock disabled={materialDisabled} message="等待数据加载">
-                  <MaterialShelf items={active.graphFiles} emptyText="暂无 graph-file。" />
-                </DisabledBlock>
+                              setMaterialUploadFiles([]);
+                            } catch (actionError) {
+                              setError(actionError instanceof Error ? actionError.message : '上传教学材料失败');
+                            } finally {
+                              setMaterialUploadBusy(false);
+                            }
+                          }}
+                        >
+                          {materialUploadBusy ? '处理中...' : '上传教学材料'}
+                        </Button>
+                      </div>
+                    </div>
+                    <DisabledBlock disabled={materialDisabled} message="等待数据加载">
+                      <MaterialShelf items={active.graphFiles} emptyText="暂无 graph-file。" />
+                    </DisabledBlock>
+                  </>
+                )}
               </article>
             </section>
           ) : null}
@@ -1616,3 +1783,4 @@ export default function TeacherDashboard({ navigate }) {
     </>
   );
 }
+
