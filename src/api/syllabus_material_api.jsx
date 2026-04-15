@@ -105,6 +105,7 @@ function parseMaterialListResponse(response) {
 
   return rows.map((row) => ({
     materialId: row.material_id,
+    fileId: row.file_id ?? null,
     title: row.title,
     draftPath: row.draft_path,
     finalPath: row.final_path,

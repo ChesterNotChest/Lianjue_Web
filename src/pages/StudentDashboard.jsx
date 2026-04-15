@@ -17,6 +17,7 @@ import {
   initPersonalSyllabus,
   updatePersonalSyllabus,
 } from '../api/learning_api';
+import { downloadFile } from '../api/file_transmit_api';
 import { getCurrentUserId } from '../api/session';
 
 function cloneData(value) {
@@ -195,6 +196,19 @@ export default function StudentDashboard({ navigate }) {
   const recommendationItems = questionAsked
     ? active?.recommendedMaterials ?? []
     : active?.defaultRecommendations ?? [];
+  const recommendationDownloadItems = recommendationItems.map((item) => ({
+    ...item,
+    onDownload: async (downloadItem) => {
+      try {
+        const result = await downloadFile(downloadItem.fileId, downloadItem.title);
+        if (!result.success) {
+          throw new Error(result.error_message || '下载失败');
+        }
+      } catch (actionError) {
+        setError(actionError instanceof Error ? actionError.message : '下载失败');
+      }
+    },
+  }));
 
   return (
     <MainLayout
@@ -376,7 +390,7 @@ export default function StudentDashboard({ navigate }) {
                   <LoadingPlaceholder size="shelf" />
                 ) : (
                   <DisabledBlock disabled={disabled} message="请先选择学习">
-                    <MaterialShelf items={recommendationItems} emptyText="暂无可展示的推荐材料。" />
+                    <MaterialShelf items={recommendationDownloadItems} emptyText="暂无可展示的推荐材料。" />
                   </DisabledBlock>
                 )}
               </article>
@@ -394,17 +408,21 @@ export default function StudentDashboard({ navigate }) {
               ) : (
                 <DisabledBlock disabled={disabled} message="请先选择学习">
                   <div className="study-record-grid">
-                    <section className="study-mode">
-                      <strong className="study-mode-title">方式 A</strong>
-                      <FileDropzone
-                        files={studyRecordFiles}
-                        onFilesChange={setStudyRecordFiles}
-                        title="上传学习记录 / dropbox"
-                      />
-                      <label className="field">
-                        <span>补充说明</span>
-                        <textarea rows="3" placeholder="输入学习记录说明" />
-                      </label>
+                    <section>
+                      <DisabledBlock disabled message="正在开发">
+                        <div className="study-mode is-disabled-mode">
+                          <strong className="study-mode-title">方式 A</strong>
+                          <FileDropzone
+                            files={studyRecordFiles}
+                            onFilesChange={setStudyRecordFiles}
+                            title="上传学习记录 / dropbox"
+                          />
+                          <label className="field">
+                            <span>补充说明</span>
+                            <textarea rows="3" placeholder="输入学习记录说明" />
+                          </label>
+                        </div>
+                      </DisabledBlock>
                     </section>
 
                     <section className="study-mode">

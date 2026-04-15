@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 function Button({ children, variant = 'secondary', disabled = false, className = '', ...props }) {
   return (
     <button
@@ -281,6 +283,28 @@ function WeekAxis({
 }
 
 function MaterialShelf({ items, emptyText = '暂无材料。', rows = 2 }) {
+  const titleRefs = useRef(new Map());
+  const [overflowMap, setOverflowMap] = useState({});
+  const [expandedKey, setExpandedKey] = useState('');
+
+  useEffect(() => {
+    const measureOverflow = () => {
+      const nextOverflowMap = {};
+
+      items.forEach((item, index) => {
+        const key = `${item.fileId ?? 'no-file'}-${item.title}-${index}`;
+        const element = titleRefs.current.get(key);
+        nextOverflowMap[key] = Boolean(element && element.scrollWidth > element.clientWidth + 1);
+      });
+
+      setOverflowMap(nextOverflowMap);
+    };
+
+    measureOverflow();
+    window.addEventListener('resize', measureOverflow);
+    return () => window.removeEventListener('resize', measureOverflow);
+  }, [items, rows]);
+
   if (!items.length) {
     return <EmptyState>{emptyText}</EmptyState>;
   }
@@ -288,18 +312,87 @@ function MaterialShelf({ items, emptyText = '暂无材料。', rows = 2 }) {
   return (
     <div className="material-shelf">
       <div className={`material-shelf-grid ${rows === 1 ? 'is-single-row' : ''}`}>
-        {items.map((item, index) => (
-          <article key={`${item.title}-${index}`} className="material-chip-card">
-            <div className="material-chip-head">
-              <strong>{item.title}</strong>
-              {item.tagText ? <StatusPill tone={item.tagTone ?? 'neutral'}>{item.tagText}</StatusPill> : null}
-            </div>
-            <small>
-              {item.source}
-              {item.weekLabel ? ` / ${item.weekLabel}` : ''}
-            </small>
-          </article>
-        ))}
+        {items.map((item, index) => {
+          const isDownloadable = Boolean(item?.fileId) && typeof item?.onDownload === 'function';
+          const itemKey = `${item.fileId ?? 'no-file'}-${item.title}-${index}`;
+          const isOverflowing = Boolean(overflowMap[itemKey]);
+          const isExpanded = expandedKey === itemKey;
+
+          return (
+            <article
+              key={`${item.title}-${index}`}
+              className={[
+                'material-chip-card',
+                isDownloadable ? 'is-downloadable' : '',
+                isExpanded ? 'is-expanded' : '',
+              ].filter(Boolean).join(' ')}
+              role={isDownloadable ? 'button' : undefined}
+              tabIndex={isDownloadable ? 0 : undefined}
+              onClick={isDownloadable ? () => item.onDownload(item) : undefined}
+              onMouseEnter={() => {
+                if (isOverflowing) {
+                  setExpandedKey(itemKey);
+                }
+              }}
+              onMouseLeave={() => {
+                if (expandedKey === itemKey) {
+                  setExpandedKey('');
+                }
+              }}
+              onFocus={() => {
+                if (isOverflowing) {
+                  setExpandedKey(itemKey);
+                }
+              }}
+              onBlur={() => {
+                if (expandedKey === itemKey) {
+                  setExpandedKey('');
+                }
+              }}
+              onKeyDown={isDownloadable ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  item.onDownload(item);
+                }
+              } : undefined}
+            >
+              <div className="material-chip-head">
+                <strong
+                  ref={(element) => {
+                    if (element) {
+                      titleRefs.current.set(itemKey, element);
+                    } else {
+                      titleRefs.current.delete(itemKey);
+                    }
+                  }}
+                  className="material-chip-title"
+                  title={isOverflowing ? item.title : undefined}
+                >
+                  {item.title}
+                </strong>
+                <div className="material-chip-actions">
+                  {item.tagText ? <StatusPill tone={item.tagTone ?? 'neutral'}>{item.tagText}</StatusPill> : null}
+                  {isDownloadable ? (
+                    <Button
+                      variant="ghost"
+                      className="button-compact material-chip-download"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        item.onDownload(item);
+                      }}
+                    >
+                      下载
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <small>
+                {item.source}
+                {item.weekLabel ? ` / ${item.weekLabel}` : ''}
+              </small>
+            </article>
+          );
+        })}
       </div>
     </div>
   );

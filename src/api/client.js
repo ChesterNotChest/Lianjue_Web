@@ -5,7 +5,7 @@ const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND_URL;
 export const BACKEND_URL = rawBackendUrl.replace(/\/+$/, '');
 export const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API || '').toLowerCase() === 'true';
 
-function buildUrl(path, query = {}) {
+export function buildUrl(path, query = {}) {
   const url = new URL(`${BACKEND_URL}${path.startsWith('/') ? path : `/${path}`}`);
   Object.entries(query).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {

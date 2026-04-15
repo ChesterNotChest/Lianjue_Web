@@ -34,7 +34,7 @@ import {
   updateSyllabusDraft,
   uploadCalendar,
 } from '../api/syllabus_material_api';
-import { getFileDetail, uploadFile } from '../api/file_transmit_api';
+import { downloadFile, getFileDetail, uploadFile } from '../api/file_transmit_api';
 import { createJob } from '../api/job_api';
 import { getCurrentUserId } from '../api/session';
 
@@ -280,6 +280,7 @@ function getMaterialShelfItems(materialDrafts) {
     const involvedWeeks = item.finalData?.involved_weeks ?? item.draft?.involved_weeks ?? [];
 
     return {
+      fileId: item.fileId ?? null,
       title: item.title,
       source: `material ${item.materialId}`,
       weekLabel: involvedWeeks.length ? `第 ${involvedWeeks.join(', ')} 周` : '',
@@ -1015,6 +1016,17 @@ export default function TeacherDashboard({ navigate }) {
   const [materialModal, setMaterialModal] = useState({ open: false });
   const [materialUploadFiles, setMaterialUploadFiles] = useState([]);
   const [materialUploadBusy, setMaterialUploadBusy] = useState(false);
+
+  const handleDownloadFile = async (item) => {
+    if (!item?.fileId) {
+      return;
+    }
+
+    const result = await downloadFile(item.fileId, item.title);
+    if (!result.success) {
+      throw new Error(result.error_message || '下载失败');
+    }
+  };
   const [expandedTeacherWeekId, setExpandedTeacherWeekId] = useState(null);
 
   useEffect(() => {
@@ -1319,7 +1331,16 @@ export default function TeacherDashboard({ navigate }) {
                       message={weakKnowledge ? '知识来源过少' : '等待数据加载'}
                     >
                       <MaterialShelf
-                        items={materialDraftShelfItems}
+                        items={materialDraftShelfItems.map((item) => ({
+                          ...item,
+                          onDownload: async (downloadItem) => {
+                            try {
+                              await handleDownloadFile(downloadItem);
+                            } catch (actionError) {
+                              setError(actionError instanceof Error ? actionError.message : '下载失败');
+                            }
+                          },
+                        }))}
                         rows={2}
                         emptyText="暂无习题文件。"
                       />
@@ -1416,7 +1437,19 @@ export default function TeacherDashboard({ navigate }) {
                       </div>
                     </div>
                     <DisabledBlock disabled={materialDisabled} message="等待数据加载">
-                      <MaterialShelf items={active.graphFiles} emptyText="暂无 graph-file。" />
+                      <MaterialShelf
+                        items={(active.graphFiles ?? []).map((item) => ({
+                          ...item,
+                          onDownload: async (downloadItem) => {
+                            try {
+                              await handleDownloadFile(downloadItem);
+                            } catch (actionError) {
+                              setError(actionError instanceof Error ? actionError.message : '下载失败');
+                            }
+                          },
+                        }))}
+                        emptyText="暂无 graph-file。"
+                      />
                     </DisabledBlock>
                   </>
                 )}

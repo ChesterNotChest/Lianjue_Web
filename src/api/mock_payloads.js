@@ -318,6 +318,7 @@ const RAW_LIST_MATERIALS_BRIEF_INFO_RESPONSE_BY_SYLLABUS_ID = {
     materials: [
       {
         material_id: 101,
+        file_id: 301,
         title: '大数据概论_20260402223302',
         draft_path: './material/draft_material_json/bigdata_1775140427.json',
         final_path: './material/material_json/bigdata_1775140508.json',

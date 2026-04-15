@@ -2,7 +2,7 @@ import {
   RAW_LIST_ALL_FILES_BRIEF_INFO_RESPONSE_BY_GRAPH_ID,
   RAW_LIST_ALL_FILES_BRIEF_INFO_RESPONSE_BY_SYLLABUS_ID,
 } from './mock_payloads';
-import { USE_MOCK_API, apiPost, fileToUploadPayload } from './client';
+import { USE_MOCK_API, apiPost, buildUrl, fileToUploadPayload } from './client';
 
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
@@ -75,6 +75,36 @@ function parseFileDetailResponse(response) {
   };
 }
 
+function pickDownloadFilename(headers, fallbackName) {
+  const contentDisposition = headers?.get?.('Content-Disposition') ?? '';
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+  if (plainMatch?.[1]) {
+    return plainMatch[1];
+  }
+
+  return fallbackName || 'download';
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = downloadUrl;
+  anchor.download = filename || 'download';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 0);
+}
+
 export async function listGraphFilesRaw(graphIdList = []) {
   if (!USE_MOCK_API) {
     return apiPost('/api/file_list_graph_files', { graph_id_list: graphIdList });
@@ -111,6 +141,85 @@ export async function getFileDetailRaw(fileId) {
 
 export async function getFileDetail(fileId) {
   return parseFileDetailResponse(await getFileDetailRaw(fileId));
+}
+
+export async function downloadFileRaw(fileId) {
+  if (USE_MOCK_API) {
+    const detail = parseFileDetailResponse(
+      mockFileDetailResponseById[fileId] ?? {
+        success: false,
+        file: null,
+        error_message: 'not_found',
+        error_code: 'not_found',
+      },
+    );
+
+    if (!detail) {
+      return {
+        success: false,
+        blob: null,
+        filename: null,
+        error_message: 'not_found',
+        error_code: 'not_found',
+      };
+    }
+
+    const mockContent = [
+      `Mock file download`,
+      `file_id=${detail.fileId}`,
+      `filename=${detail.title ?? ''}`,
+      `path=${detail.path ?? ''}`,
+    ].join('\n');
+
+    return {
+      success: true,
+      blob: new Blob([mockContent], { type: 'text/plain;charset=utf-8' }),
+      filename: detail.title || `file_${fileId}.txt`,
+      error_message: '',
+      error_code: '',
+    };
+  }
+
+  const response = await fetch(buildUrl('/api/file_download', { file_id: fileId }));
+  if (!response.ok) {
+    const text = await response.text();
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = {
+        error_message: text || response.statusText,
+        error_code: 'download_failed',
+      };
+    }
+
+    return {
+      success: false,
+      blob: null,
+      filename: null,
+      error_message: payload.error_message ?? 'download_failed',
+      error_code: payload.error_code ?? 'download_failed',
+    };
+  }
+
+  const blob = await response.blob();
+  return {
+    success: true,
+    blob,
+    filename: pickDownloadFilename(response.headers, `file_${fileId}`),
+    error_message: '',
+    error_code: '',
+  };
+}
+
+export async function downloadFile(fileId, fallbackTitle = '') {
+  const result = await downloadFileRaw(fileId);
+  if (!result.success || !result.blob) {
+    return result;
+  }
+
+  triggerBrowserDownload(result.blob, result.filename || fallbackTitle || `file_${fileId}`);
+  return result;
 }
 
 export async function uploadFile(payload = {}) {
