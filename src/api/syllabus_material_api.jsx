@@ -326,8 +326,12 @@ async function buildTeacherSyllabusVisibleData(item) {
 
 async function buildTeacherSyllabusBuildData(item) {
   const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
-  const draft = item.draftPath ? parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(item.syllabusId)) : null;
-  const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
+  const draft = !status.isDraftMissing
+    ? parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(item.syllabusId))
+    : null;
+  const finalData = !status.isFinalMissing
+    ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId))
+    : null;
 
   return {
     title: finalData?.title ?? draft?.title ?? item.title,
@@ -343,12 +347,18 @@ async function buildTeacherSyllabusMaterialDetails(item) {
   const syllabusFiles = await listSyllabusFiles([item.syllabusId]);
   const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
   const materialDrafts = await Promise.all(
-    materialList.map(async (material) => ({
-      ...material,
-      draft: parseMaterialDraftResponse(await getMaterialDraftDetailRaw(material.materialId)),
-      finalData: material.finalPath ? parseMaterialDetailResponse(await getMaterialDetailRaw(material.materialId)) : null,
-      status: parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId)),
-    })),
+    materialList.map(async (material) => {
+      const status = parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId));
+
+      return {
+        ...material,
+        draft: parseMaterialDraftResponse(await getMaterialDraftDetailRaw(material.materialId)),
+        finalData: !status.isFinalMissing
+          ? parseMaterialDetailResponse(await getMaterialDetailRaw(material.materialId))
+          : null,
+        status,
+      };
+    }),
   );
 
   return {
@@ -550,6 +560,7 @@ export async function createGraph(payload = {}) {
 }
 
 export async function uploadCalendar(payload = {}) {
+  const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
   if (!USE_MOCK_API) {
     const file = payload.file ?? payload.files?.[0] ?? null;
     if (!file && !(payload.fileName || payload.file_name) && !(payload.fileBytes || payload.file_bytes)) {
@@ -569,6 +580,7 @@ export async function uploadCalendar(payload = {}) {
           file_bytes: payload.fileBytes ?? payload.file_bytes,
           upload_time: payload.uploadTime ?? payload.upload_time,
         };
+    request.user_id = userId;
 
     return parseSyllabusMutationResponse(await apiPost('/api/file_upload_calendar', request));
   }

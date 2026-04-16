@@ -1496,6 +1496,7 @@ export default function TeacherDashboard({ navigate }) {
               const response = await uploadCalendar({
                 graphId: buildModal.selectedGraphId,
                 file: buildModal.calendarFiles[0],
+                userId: getCurrentUserId(),
               });
               if (!response.success || !response.syllabusId) {
                 throw new Error(response.errorMessage || '上传失败');
@@ -1550,29 +1551,43 @@ export default function TeacherDashboard({ navigate }) {
                 syllabusId: buildTarget.syllabusId,
                 graphId: buildModal.selectedGraphId || buildTarget.graphId,
               });
-              patchSyllabusById(buildTarget.syllabusId, (item) => {
-                item.status.isDraftMissing = false;
-                item.draft = buildDraftJson(buildModal);
-                item.graphId = buildModal.selectedGraphId || item.graphId;
-                item.graphName = buildModal.selectedGraphName || item.graphName;
-                return item;
-              });
-              setBuildModal((current) => ({
-                ...current,
-                syllabus: {
-                  ...current.syllabus,
-                  status: {
-                    ...current.syllabus.status,
-                    isDraftMissing: false,
-                  },
-                  draft: buildDraftJson(current),
-                  graphId: current.selectedGraphId || current.syllabus.graphId,
-                  graphName: current.selectedGraphName || current.syllabus.graphName,
+              const refreshedBuildData = await getTeacherSyllabusBuildData({
+                ...cloneData(buildTarget),
+                graphId: buildModal.selectedGraphId || buildTarget.graphId,
+                graphName: buildModal.selectedGraphName || buildTarget.graphName,
+                status: {
+                  ...buildTarget.status,
+                  isDraftMissing: false,
                 },
-                finalPeriod: createFinalPeriodFromDraft(current.draftPeriod),
-                busy: '',
-                step: 2,
+              });
+              const refreshedDraft = refreshedBuildData.draft ?? buildDraftJson(buildModal);
+
+              patchSyllabusById(buildTarget.syllabusId, (item) => mergeSyllabusData(item, {
+                ...refreshedBuildData,
+                graphId: buildModal.selectedGraphId || item.graphId,
+                graphName: buildModal.selectedGraphName || refreshedBuildData.graphName || item.graphName,
+                draft: refreshedDraft,
               }));
+              setBuildModal((current) => {
+                const nextDraftPeriod = refreshedDraft?.period?.length
+                  ? cloneData(refreshedDraft.period)
+                  : current.draftPeriod;
+
+                return {
+                  ...current,
+                  syllabus: mergeSyllabusData(current.syllabus, {
+                    ...refreshedBuildData,
+                    graphId: current.selectedGraphId || current.syllabus.graphId,
+                    graphName: current.selectedGraphName || refreshedBuildData.graphName || current.syllabus.graphName,
+                    draft: refreshedDraft,
+                  }),
+                  draftTitle: refreshedDraft?.title ?? current.draftTitle,
+                  draftPeriod: nextDraftPeriod,
+                  finalPeriod: createFinalPeriodFromDraft(nextDraftPeriod),
+                  busy: '',
+                  step: 2,
+                };
+              });
             } catch (actionError) {
               setBuildModal((current) => ({ ...current, busy: '' }));
               setError(actionError instanceof Error ? actionError.message : '生成草稿失败');
@@ -1786,10 +1801,18 @@ export default function TeacherDashboard({ navigate }) {
             setError('');
             try {
               await generateFinalMaterial({ materialId: materialModal.materialId });
+              const [finalResponse, statusResponse] = await Promise.all([
+                getMaterialDetailRaw(materialModal.materialId),
+                getMaterialStatusRaw(materialModal.materialId),
+              ]);
+              const finalData = parseMaterialDetailResponse(finalResponse);
+              const status = parseMaterialStatusResponse(statusResponse);
               const nextQuestions = (
-                materialModal.finalQuestions.length
-                  ? materialModal.finalQuestions
-                  : cloneData(materialModal.draftQuestions)
+                finalData?.questions?.length
+                  ? finalData.questions
+                  : (materialModal.finalQuestions.length
+                    ? materialModal.finalQuestions
+                    : cloneData(materialModal.draftQuestions))
               ).map(hydrateFinalQuestion);
 
               patchActive((item) => {
@@ -1797,8 +1820,8 @@ export default function TeacherDashboard({ navigate }) {
                   (draft) => draft.materialId === materialModal.materialId,
                 );
                 if (target) {
-                  target.status.isFinalMissing = false;
-                  target.finalData = {
+                  target.status = status;
+                  target.finalData = finalData ?? {
                     material_title: materialModal.draftTitle,
                     involved_weeks: cloneData(materialModal.involvedWeeks),
                     questions: cloneData(nextQuestions),
@@ -1810,6 +1833,8 @@ export default function TeacherDashboard({ navigate }) {
               setMaterialModal((current) => ({
                 ...current,
                 busy: '',
+                draftTitle: finalData?.material_title ?? current.draftTitle,
+                involvedWeeks: cloneData(finalData?.involved_weeks ?? current.involvedWeeks),
                 finalQuestions: nextQuestions,
                 step: 3,
               }));
