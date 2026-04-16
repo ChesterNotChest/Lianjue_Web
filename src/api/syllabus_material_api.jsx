@@ -262,6 +262,7 @@ function createTeacherSyllabusBaseItem(item) {
     syllabusFiles: [],
     materialDrafts: [],
     materialShelf: [],
+    isSoftLoaded: false,
     isVisibleLoaded: false,
     isBuildLoaded: false,
     isMaterialDetailsLoaded: false,
@@ -321,6 +322,39 @@ async function buildTeacherSyllabusVisibleData(item) {
     materialDrafts,
     materialShelf: mapMaterialShelf([], graphFiles),
     isVisibleLoaded: true,
+  };
+}
+
+async function buildTeacherSyllabusSoftRefreshData(item) {
+  const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
+  const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
+  const jobs = item.graphId ? await listJobs(item.graphId) : [];
+  const graphFiles = mapGraphFiles(rawGraphFiles, jobs);
+  const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
+  const materialStatuses = await Promise.all(
+    materialList.map(async (material) => parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId))),
+  );
+  const materialDrafts = materialList.map((material, index) => ({
+    ...material,
+    draft: null,
+    finalData: null,
+    status: materialStatuses[index],
+  }));
+
+  return {
+    title: item.title,
+    permission: item.permission,
+    graphId: item.graphId,
+    graphName: item.graphName,
+    dayOneTime: item.dayOneTime,
+    eduCalendarPath: item.eduCalendarPath ?? null,
+    draftPath: item.draftPath ?? null,
+    finalPath: item.finalPath ?? null,
+    status,
+    graphFiles,
+    graphFileCount: rawGraphFiles.length,
+    materialDrafts,
+    isSoftLoaded: true,
   };
 }
 
@@ -485,6 +519,11 @@ export async function getTeacherSyllabusBuildData(syllabus) {
     normalized.syllabusId,
     () => buildTeacherSyllabusBuildData(normalized),
   );
+}
+
+export async function getTeacherSyllabusSoftRefreshData(syllabus) {
+  const normalized = normalizeTeacherSyllabusItem(syllabus);
+  return buildTeacherSyllabusSoftRefreshData(normalized);
 }
 
 export async function getTeacherSyllabusMaterialDetails(syllabus) {
