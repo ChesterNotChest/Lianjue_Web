@@ -13,6 +13,7 @@ import {
 import {
   askQuestion,
   getPersonalSyllabus,
+  getLearningProfile,
   getStudentDashboardData,
   initPersonalSyllabus,
   updatePersonalSyllabus,
@@ -91,11 +92,23 @@ function FileDropzone({ files, onFilesChange, title = '选择文件 / dropbox' }
   );
 }
 
+function toProfileEntries(knowledgeMastery) {
+  if (!knowledgeMastery || typeof knowledgeMastery !== 'object') {
+    return [];
+  }
+
+  return Object.entries(knowledgeMastery).slice(0, 8);
+}
+
 export default function StudentDashboard({ navigate }) {
   const [syllabuses, setSyllabuses] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [isBooting, setIsBooting] = useState(true);
   const [error, setError] = useState('');
+  const [learningProfile, setLearningProfile] = useState(null);
+  const [dialogueTextForProfile, setDialogueTextForProfile] = useState('');
+  const [advancedJsonText, setAdvancedJsonText] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
   const [questionInput, setQuestionInput] = useState('');
   const [questionAsked, setQuestionAsked] = useState(false);
   const [answer, setAnswer] = useState('');
@@ -128,6 +141,16 @@ export default function StudentDashboard({ navigate }) {
         }
         setSyllabuses(response.syllabuses);
         setActiveId(response.syllabuses[0]?.syllabusId ?? null);
+        try {
+          const profileRes = await getLearningProfile({
+            syllabusId: response.syllabuses[0]?.syllabusId ?? null,
+          });
+          if (!cancelled && profileRes?.success) {
+            setLearningProfile(profileRes.profile ?? null);
+          }
+        } catch {
+          // Keep dashboard boot resilient if profile loading fails.
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '加载失败');
@@ -276,6 +299,135 @@ export default function StudentDashboard({ navigate }) {
             </div>
           ) : null}
         </section>
+
+        {active ? (
+          <section
+            className="tile-card tile-span-full"
+            style={{ padding: 20, display: 'grid', gap: 16 }}
+          >
+            <div className="tile-card-head">
+              <h3>Learning Profile</h3>
+              <StatusPill tone={learningProfile ? 'success' : 'neutral'}>
+                {learningProfile ? 'loaded' : 'not loaded'}
+              </StatusPill>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <label className="field" style={{ flex: '1 1 420px', minWidth: 320 }}>
+                <span>Recent dialogue summary</span>
+                <textarea
+                  rows={3}
+                  value={dialogueTextForProfile}
+                  placeholder="Optional. Add recent learning goals or conversation context."
+                  onChange={(event) => setDialogueTextForProfile(event.target.value)}
+                />
+              </label>
+
+              <div style={{ flex: '1 1 320px', minWidth: 280, display: 'grid', gap: 8 }}>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span>Advanced payload (JSON)</span>
+                  <textarea
+                    rows={3}
+                    value={advancedJsonText}
+                    placeholder='Optional. Example: {"learning_records":[...],"answer_records":[...]}'
+                    onChange={(event) => setAdvancedJsonText(event.target.value)}
+                  />
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="primary"
+                    disabled={profileLoading}
+                    onClick={async () => {
+                      setProfileLoading(true);
+                      setError('');
+
+                      try {
+                        let extra = {};
+                        if (advancedJsonText.trim()) {
+                          try {
+                            const parsed = JSON.parse(advancedJsonText);
+                            extra = parsed && typeof parsed === 'object' ? parsed : {};
+                          } catch {
+                            throw new Error('Advanced payload JSON is invalid.');
+                          }
+                        }
+
+                        const response = await getLearningProfile({
+                          syllabusId: active.syllabusId,
+                          dialogueText: dialogueTextForProfile || undefined,
+                          ...extra,
+                        });
+
+                        if (!response?.success) {
+                          throw new Error(response?.errorMessage || 'Learning profile request failed.');
+                        }
+
+                        setLearningProfile(response.profile ?? null);
+                      } catch (actionError) {
+                        setError(actionError instanceof Error ? actionError.message : 'Learning profile request failed.');
+                      } finally {
+                        setProfileLoading(false);
+                      }
+                    }}
+                  >
+                    {profileLoading ? 'Refreshing...' : 'Refresh profile'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setDialogueTextForProfile('');
+                      setAdvancedJsonText('');
+                    }}
+                  >
+                    Clear inputs
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {learningProfile ? (
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 320px', minWidth: 280, display: 'grid', gap: 10 }}>
+                  <div><strong>Goal:</strong> {learningProfile.learning_goal ?? 'Not provided'}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <StatusPill tone="neutral">Level: {learningProfile.target_level ?? 'unknown'}</StatusPill>
+                    <StatusPill tone="neutral">Style: {learningProfile.learning_style ?? 'unknown'}</StatusPill>
+                    <StatusPill tone="neutral">Frequency: {learningProfile.study_frequency ?? 'unknown'}</StatusPill>
+                    <StatusPill tone="neutral">Duration: {learningProfile.study_duration ?? 'unknown'}</StatusPill>
+                  </div>
+                  <div><strong>Risk:</strong> {learningProfile.dropout_risk ?? 'unknown'}</div>
+                  <div>
+                    <strong>Bottlenecks:</strong>{' '}
+                    {Array.isArray(learningProfile.bottleneck_topics) && learningProfile.bottleneck_topics.length
+                      ? learningProfile.bottleneck_topics.join(', ')
+                      : 'none'}
+                  </div>
+                </div>
+
+                <div style={{ flex: '1 1 360px', minWidth: 300, display: 'grid', gap: 8 }}>
+                  <strong>Knowledge mastery</strong>
+                  {toProfileEntries(learningProfile.knowledge_mastery).length ? (
+                    toProfileEntries(learningProfile.knowledge_mastery).map(([topic, value]) => {
+                      const score = Number(value) || 0;
+                      const percent = Math.max(0, Math.min(100, Math.round(score * 100)));
+                      return (
+                        <div key={topic} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 48px', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 13 }}>{topic}</span>
+                          <div style={{ height: 10, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+                            <div style={{ width: `${percent}%`, height: '100%', background: '#0f766e' }} />
+                          </div>
+                          <span style={{ fontSize: 12, textAlign: 'right' }}>{percent}%</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <EmptyState>No knowledge mastery data.</EmptyState>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {error ? <EmptyState>{error}</EmptyState> : null}
         {!error && !active && !isBooting ? <EmptyState>暂无教学大纲。</EmptyState> : null}

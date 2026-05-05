@@ -60,6 +60,15 @@ function parseUpdatePersonalSyllabusResponse(response) {
   };
 }
 
+function parseLearningProfileResponse(response) {
+  return {
+    success: Boolean(response?.success),
+    profile: response?.profile ?? response?.learning_profile ?? null,
+    errorMessage: response?.error_message ?? '',
+    errorCode: response?.error_code ?? '',
+  };
+}
+
 function formatWeekLabel(weekIndexList = []) {
   return weekIndexList.length ? `week ${weekIndexList.join(', ')}` : '';
 }
@@ -370,6 +379,38 @@ export async function askQuestionRaw(payload = {}) {
   };
 }
 
+export async function getLearningProfileRaw(payload = {}) {
+  const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
+  if (!USE_MOCK_API) {
+    return apiPost('/api/user_learning_profile', {
+      user_id: userId,
+      syllabus_id: payload.syllabusId ?? payload.syllabus_id ?? null,
+      dialogue_text: payload.dialogueText ?? payload.dialogue_text ?? null,
+      learning_goal: payload.learningGoal ?? payload.learning_goal ?? null,
+      learning_records: payload.learningRecords ?? payload.learning_records ?? null,
+      answer_records: payload.answerRecords ?? payload.answer_records ?? null,
+      resource_usage: payload.resourceUsage ?? payload.resource_usage ?? null,
+    });
+  }
+
+  return {
+    success: true,
+    profile: {
+      user_id: userId,
+      learning_goal: payload.learningGoal ?? 'Not provided',
+      target_level: 'unknown',
+      learning_style: 'unknown',
+      study_frequency: 'unknown',
+      study_duration: 'unknown',
+      bottleneck_topics: [],
+      dropout_risk: 'unknown',
+      knowledge_mastery: {},
+    },
+    error_message: '',
+    error_code: '',
+  };
+}
+
 export async function initPersonalSyllabusRaw(payload = {}) {
   const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
   if (!USE_MOCK_API) {
@@ -457,6 +498,10 @@ export async function updatePersonalSyllabus(payload = {}) {
   return parseUpdatePersonalSyllabusResponse(await updatePersonalSyllabusRaw(payload));
 }
 
+export async function getLearningProfile(payload = {}) {
+  return parseLearningProfileResponse(await getLearningProfileRaw(payload));
+}
+
 export async function askQuestion(payload = {}) {
   const parsed = parseAskQuestionResponse(await askQuestionRaw(payload));
   const syllabusFiles = payload.syllabusId ? await listSyllabusFiles([payload.syllabusId]) : [];
@@ -479,6 +524,7 @@ export async function askQuestion(payload = {}) {
 
 export {
   parseAskQuestionResponse,
+  parseLearningProfileResponse,
   parseInitPersonalSyllabusResponse,
   parsePersonalSyllabusResponse,
   parseStudentSyllabusListResponse,
