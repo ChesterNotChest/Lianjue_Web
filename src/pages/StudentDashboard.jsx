@@ -12,15 +12,9 @@ import {
 } from '../components/DashboardShared';
 import {
   askQuestion,
-<<<<<<< HEAD
   getPersonalSyllabus,
-  getStudentDashboardData,
   getLearningProfile,
-=======
-  getLearningProfile,
-  getPersonalSyllabus,
   getStudentDashboardData,
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   initPersonalSyllabus,
   updatePersonalSyllabus,
 } from '../api/learning_api';
@@ -98,8 +92,6 @@ function FileDropzone({ files, onFilesChange, title = '选择文件 / dropbox' }
   );
 }
 
-<<<<<<< HEAD
-=======
 function toProfileEntries(knowledgeMastery) {
   if (!knowledgeMastery || typeof knowledgeMastery !== 'object') {
     return [];
@@ -108,7 +100,6 @@ function toProfileEntries(knowledgeMastery) {
   return Object.entries(knowledgeMastery).slice(0, 8);
 }
 
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 export default function StudentDashboard({ navigate }) {
   const [syllabuses, setSyllabuses] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -151,14 +142,6 @@ export default function StudentDashboard({ navigate }) {
         setSyllabuses(response.syllabuses);
         setActiveId(response.syllabuses[0]?.syllabusId ?? null);
         try {
-<<<<<<< HEAD
-          const profileRes = await getLearningProfile();
-          if (!cancelled && profileRes && profileRes.success) {
-            setLearningProfile(profileRes.profile ?? null);
-          }
-        } catch (pfErr) {
-          // ignore learning profile fetch errors for now
-=======
           const profileRes = await getLearningProfile({
             syllabusId: response.syllabuses[0]?.syllabusId ?? null,
           });
@@ -167,7 +150,6 @@ export default function StudentDashboard({ navigate }) {
           }
         } catch {
           // Keep dashboard boot resilient if profile loading fails.
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -316,124 +298,6 @@ export default function StudentDashboard({ navigate }) {
               </StatusPill>
             </div>
           ) : null}
-<<<<<<< HEAD
-
-          <div style={{ marginTop: 12, marginBottom: 8, display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 420px', minWidth: 320 }}>
-              <label className="field">
-                <span>对话摘要（可选）</span>
-                <textarea
-                  rows={3}
-                  value={dialogueTextForProfile}
-                  placeholder="填写最近的对话或学习目标，例如：我想在两周内掌握函数与循环"
-                  onChange={(e) => setDialogueTextForProfile(e.target.value)}
-                />
-              </label>
-            </div>
-
-            <div style={{ width: 260, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span>高级数据 (JSON，可选)</span>
-                <textarea
-                  rows={3}
-                  value={advancedJsonText}
-                  placeholder='例如：{"learning_records": [...], "answer_records": [...]}'
-                  onChange={(e) => setAdvancedJsonText(e.target.value)}
-                />
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button
-                  variant="primary"
-                  disabled={profileLoading}
-                  onClick={async () => {
-                    setProfileLoading(true);
-                    setError('');
-                    try {
-                      let extra = {};
-                      if (advancedJsonText && advancedJsonText.trim()) {
-                        try {
-                          const parsed = JSON.parse(advancedJsonText);
-                          extra = parsed && typeof parsed === 'object' ? parsed : {};
-                        } catch (pe) {
-                          throw new Error('高级数据 JSON 解析失败');
-                        }
-                      }
-
-                      const payload = {
-                        syllabusId: active?.syllabusId ?? null,
-                        dialogueText: dialogueTextForProfile || undefined,
-                        ...extra,
-                      };
-
-                      const res = await getLearningProfile(payload);
-                      if (!res || !res.success) {
-                        throw new Error(res?.errorMessage || res?.error_message || '画像请求失败');
-                      }
-                      setLearningProfile(res.profile ?? null);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : String(err));
-                    } finally {
-                      setProfileLoading(false);
-                    }
-                  }}
-                >
-                  {profileLoading ? '刷新中...' : '刷新画像'}
-                </Button>
-                <Button variant="ghost" onClick={() => { setDialogueTextForProfile(''); setAdvancedJsonText(''); setError(''); }}>
-                  清空
-                </Button>
-              </div>
-            </div>
-          </div>
-          {learningProfile ? (
-            <div className="learning-profile-panel" style={{ marginTop: 12 }}>
-              <h4 style={{ margin: '6px 0' }}>学习画像</h4>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 260, flex: '1 1 320px' }}>
-                  <div style={{ marginBottom: 8 }}><strong>学习目标：</strong>{learningProfile.learning_goal ?? '未提供'}</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                    <StatusPill tone="neutral">目标层级: {learningProfile.target_level ?? '未知'}</StatusPill>
-                    <StatusPill tone="neutral">学习风格: {learningProfile.learning_style ?? '未知'}</StatusPill>
-                    <StatusPill tone="neutral">频率: {learningProfile.study_frequency ?? '未知'}</StatusPill>
-                    <StatusPill tone="neutral">时长: {learningProfile.study_duration ?? '未知'}</StatusPill>
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <strong>风险/关注：</strong>
-                    <div style={{ marginTop: 6 }}>
-                      <div>困难主题: {Array.isArray(learningProfile.bottleneck_topics) && learningProfile.bottleneck_topics.length ? learningProfile.bottleneck_topics.join('，') : '无'}</div>
-                      <div>退学风险: {learningProfile.dropout_risk ?? '未知'}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ flex: '1 1 360px', minWidth: 260 }}>
-                  <div style={{ marginBottom: 6 }}><strong>知识掌握</strong></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {learningProfile.knowledge_mastery && typeof learningProfile.knowledge_mastery === 'object' ? (
-                      Object.entries(learningProfile.knowledge_mastery).slice(0, 8).map(([k, v]) => {
-                        const score = Number(v) || 0;
-                        const pct = Math.max(0, Math.min(100, Math.round(score * 100)));
-                        return (
-                          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 110, fontSize: 13 }}>{k}</div>
-                            <div style={{ flex: 1, height: 10, background: '#eee', borderRadius: 6, overflow: 'hidden' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: '#56a3ff' }} />
-                            </div>
-                            <div style={{ width: 40, textAlign: 'right', fontSize: 12 }}>{pct}%</div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div>暂无知识掌握数据</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </section>
-=======
         </section>
 
         {active ? (
@@ -564,7 +428,6 @@ export default function StudentDashboard({ navigate }) {
             ) : null}
           </section>
         ) : null}
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
         {error ? <EmptyState>{error}</EmptyState> : null}
         {!error && !active && !isBooting ? <EmptyState>暂无教学大纲。</EmptyState> : null}

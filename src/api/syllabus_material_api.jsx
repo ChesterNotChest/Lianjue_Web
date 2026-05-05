@@ -262,10 +262,7 @@ function createTeacherSyllabusBaseItem(item) {
     syllabusFiles: [],
     materialDrafts: [],
     materialShelf: [],
-<<<<<<< HEAD
-=======
     isSoftLoaded: false,
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
     isVisibleLoaded: false,
     isBuildLoaded: false,
     isMaterialDetailsLoaded: false,
@@ -328,12 +325,6 @@ async function buildTeacherSyllabusVisibleData(item) {
   };
 }
 
-<<<<<<< HEAD
-async function buildTeacherSyllabusBuildData(item) {
-  const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
-  const draft = item.draftPath ? parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(item.syllabusId)) : null;
-  const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
-=======
 async function buildTeacherSyllabusSoftRefreshData(item) {
   const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
   const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
@@ -375,7 +366,6 @@ async function buildTeacherSyllabusBuildData(item) {
   const finalData = !status.isFinalMissing
     ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId))
     : null;
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
   return {
     title: finalData?.title ?? draft?.title ?? item.title,
@@ -391,14 +381,6 @@ async function buildTeacherSyllabusMaterialDetails(item) {
   const syllabusFiles = await listSyllabusFiles([item.syllabusId]);
   const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
   const materialDrafts = await Promise.all(
-<<<<<<< HEAD
-    materialList.map(async (material) => ({
-      ...material,
-      draft: parseMaterialDraftResponse(await getMaterialDraftDetailRaw(material.materialId)),
-      finalData: material.finalPath ? parseMaterialDetailResponse(await getMaterialDetailRaw(material.materialId)) : null,
-      status: parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId)),
-    })),
-=======
     materialList.map(async (material) => {
       const status = parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId));
 
@@ -411,7 +393,6 @@ async function buildTeacherSyllabusMaterialDetails(item) {
         status,
       };
     }),
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   );
 
   return {
@@ -540,14 +521,11 @@ export async function getTeacherSyllabusBuildData(syllabus) {
   );
 }
 
-<<<<<<< HEAD
-=======
 export async function getTeacherSyllabusSoftRefreshData(syllabus) {
   const normalized = normalizeTeacherSyllabusItem(syllabus);
   return buildTeacherSyllabusSoftRefreshData(normalized);
 }
 
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 export async function getTeacherSyllabusMaterialDetails(syllabus) {
   const normalized = normalizeTeacherSyllabusItem(syllabus);
   return reuseInflight(
@@ -621,10 +599,7 @@ export async function createGraph(payload = {}) {
 }
 
 export async function uploadCalendar(payload = {}) {
-<<<<<<< HEAD
-=======
   const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   if (!USE_MOCK_API) {
     const file = payload.file ?? payload.files?.[0] ?? null;
     if (!file && !(payload.fileName || payload.file_name) && !(payload.fileBytes || payload.file_bytes)) {
@@ -644,10 +619,7 @@ export async function uploadCalendar(payload = {}) {
           file_bytes: payload.fileBytes ?? payload.file_bytes,
           upload_time: payload.uploadTime ?? payload.upload_time,
         };
-<<<<<<< HEAD
-=======
     request.user_id = userId;
->>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
     return parseSyllabusMutationResponse(await apiPost('/api/file_upload_calendar', request));
   }
