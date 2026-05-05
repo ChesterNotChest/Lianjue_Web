@@ -60,6 +60,18 @@ function parseUpdatePersonalSyllabusResponse(response) {
   };
 }
 
+<<<<<<< HEAD
+=======
+function parseLearningProfileResponse(response) {
+  return {
+    success: Boolean(response?.success),
+    profile: response?.profile ?? response?.learning_profile ?? null,
+    errorMessage: response?.error_message ?? '',
+    errorCode: response?.error_code ?? '',
+  };
+}
+
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 function formatWeekLabel(weekIndexList = []) {
   return weekIndexList.length ? `week ${weekIndexList.join(', ')}` : '';
 }
@@ -370,6 +382,7 @@ export async function askQuestionRaw(payload = {}) {
   };
 }
 
+<<<<<<< HEAD
 function parseLearningProfileResponse(response) {
   return {
     success: Boolean(response?.success),
@@ -379,6 +392,8 @@ function parseLearningProfileResponse(response) {
   };
 }
 
+=======
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 export async function getLearningProfileRaw(payload = {}) {
   const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
   if (!USE_MOCK_API) {
@@ -386,6 +401,13 @@ export async function getLearningProfileRaw(payload = {}) {
       user_id: userId,
       syllabus_id: payload.syllabusId ?? payload.syllabus_id ?? null,
       dialogue_text: payload.dialogueText ?? payload.dialogue_text ?? null,
+<<<<<<< HEAD
+=======
+      learning_goal: payload.learningGoal ?? payload.learning_goal ?? null,
+      learning_records: payload.learningRecords ?? payload.learning_records ?? null,
+      answer_records: payload.answerRecords ?? payload.answer_records ?? null,
+      resource_usage: payload.resourceUsage ?? payload.resource_usage ?? null,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
     });
   }
 
@@ -393,7 +415,17 @@ export async function getLearningProfileRaw(payload = {}) {
     success: true,
     profile: {
       user_id: userId,
+<<<<<<< HEAD
       learning_goal: '未提供',
+=======
+      learning_goal: payload.learningGoal ?? 'Not provided',
+      target_level: 'unknown',
+      learning_style: 'unknown',
+      study_frequency: 'unknown',
+      study_duration: 'unknown',
+      bottleneck_topics: [],
+      dropout_risk: 'unknown',
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
       knowledge_mastery: {},
     },
     error_message: '',
@@ -401,11 +433,14 @@ export async function getLearningProfileRaw(payload = {}) {
   };
 }
 
+<<<<<<< HEAD
 export async function getLearningProfile(payload = {}) {
   const parsed = parseLearningProfileResponse(await getLearningProfileRaw(payload));
   return parsed;
 }
 
+=======
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 export async function initPersonalSyllabusRaw(payload = {}) {
   const userId = requireUserId({ ...payload, allowMockFallback: USE_MOCK_API });
   if (!USE_MOCK_API) {
@@ -493,6 +528,13 @@ export async function updatePersonalSyllabus(payload = {}) {
   return parseUpdatePersonalSyllabusResponse(await updatePersonalSyllabusRaw(payload));
 }
 
+<<<<<<< HEAD
+=======
+export async function getLearningProfile(payload = {}) {
+  return parseLearningProfileResponse(await getLearningProfileRaw(payload));
+}
+
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 export async function askQuestion(payload = {}) {
   const parsed = parseAskQuestionResponse(await askQuestionRaw(payload));
   const syllabusFiles = payload.syllabusId ? await listSyllabusFiles([payload.syllabusId]) : [];
@@ -515,6 +557,10 @@ export async function askQuestion(payload = {}) {
 
 export {
   parseAskQuestionResponse,
+<<<<<<< HEAD
+=======
+  parseLearningProfileResponse,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   parseInitPersonalSyllabusResponse,
   parsePersonalSyllabusResponse,
   parseStudentSyllabusListResponse,

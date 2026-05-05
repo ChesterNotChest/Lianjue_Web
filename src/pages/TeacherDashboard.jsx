@@ -20,6 +20,7 @@ import {
   generateMaterialDraft,
   getTeacherDashboardBootstrapData,
   getTeacherSyllabusBuildData,
+<<<<<<< HEAD
   getTeacherSyllabusMaterialDetails,
   getTeacherSyllabusVisibleData,
   getMaterialDraftDetailRaw,
@@ -27,6 +28,20 @@ import {
   listGraphs,
   parseMaterialDraftResponse,
   parseMaterialStatusResponse,
+=======
+  getTeacherSyllabusSoftRefreshData,
+  getMaterialDetailRaw,
+  getMaterialDraftDetailRaw,
+  getMaterialStatusRaw,
+  getSyllabusDetailRaw,
+  getSyllabusDraftDetailRaw,
+  listGraphs,
+  parseMaterialDetailResponse,
+  parseMaterialDraftResponse,
+  parseMaterialStatusResponse,
+  parseSyllabusDetailResponse,
+  parseSyllabusDraftDetailResponse,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   publishMaterial,
   updateFinalMaterial,
   updateMaterialDraft,
@@ -91,6 +106,10 @@ function createEmptySyllabus(nextId = null) {
     syllabusFiles: [],
     materialDrafts: [],
     materialShelf: [],
+<<<<<<< HEAD
+=======
+    isSoftLoaded: true,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   };
 }
 
@@ -206,6 +225,11 @@ function createBuildState(active, graphOptions = []) {
     newGraphName: '',
     selectedGraphId: active.graphId ?? '',
     calendarFiles: [],
+<<<<<<< HEAD
+=======
+    isDraftJsonLoaded: Boolean(active.draft),
+    isFinalJsonLoaded: Boolean(active.finalData),
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   };
 }
 
@@ -221,6 +245,11 @@ function createMaterialState(active) {
     draftQuestions: [],
     finalQuestions: [],
     publish: { new_pdf: true, do_publish: false },
+<<<<<<< HEAD
+=======
+    isDraftJsonLoaded: false,
+    isFinalJsonLoaded: false,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   };
 }
 
@@ -251,12 +280,78 @@ function mergeSyllabusData(source, patch) {
     syllabusFiles: patch.syllabusFiles ?? source.syllabusFiles,
     materialDrafts: patch.materialDrafts ?? source.materialDrafts,
     materialShelf: patch.materialShelf ?? source.materialShelf,
+<<<<<<< HEAD
+=======
+    isSoftLoaded: patch.isSoftLoaded ?? source.isSoftLoaded,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
     isVisibleLoaded: patch.isVisibleLoaded ?? source.isVisibleLoaded,
     isBuildLoaded: patch.isBuildLoaded ?? source.isBuildLoaded,
     isMaterialDetailsLoaded: patch.isMaterialDetailsLoaded ?? source.isMaterialDetailsLoaded,
   };
 }
 
+<<<<<<< HEAD
+=======
+function mergeBootstrapSyllabus(source, patch) {
+  return {
+    ...source,
+    syllabusId: patch.syllabusId,
+    title: patch.title,
+    permission: patch.permission,
+    graphId: patch.graphId,
+    graphName: patch.graphName,
+    dayOneTime: patch.dayOneTime,
+    eduCalendarPath: patch.eduCalendarPath,
+    draftPath: patch.draftPath,
+    finalPath: patch.finalPath,
+  };
+}
+
+function mergeSoftMaterialDrafts(source = [], patch = []) {
+  const sourceById = new Map(source.map((item) => [item.materialId, item]));
+
+  return patch.map((item) => {
+    const current = sourceById.get(item.materialId);
+    if (!current) {
+      return item;
+    }
+
+    return {
+      ...current,
+      ...item,
+      draft: current.draft ?? item.draft ?? null,
+      finalData: current.finalData ?? item.finalData ?? null,
+      status: item.status ?? current.status,
+    };
+  });
+}
+
+function mergeSoftSyllabusData(source, patch) {
+  const nextGraphFiles = patch.graphFiles ?? source.graphFiles;
+  const nextMaterialDrafts = patch.materialDrafts
+    ? mergeSoftMaterialDrafts(source.materialDrafts ?? [], patch.materialDrafts)
+    : source.materialDrafts;
+
+  return {
+    ...source,
+    title: patch.title ?? source.title,
+    permission: patch.permission ?? source.permission,
+    graphId: patch.graphId ?? source.graphId,
+    graphName: patch.graphName ?? source.graphName,
+    dayOneTime: patch.dayOneTime ?? source.dayOneTime,
+    eduCalendarPath: patch.eduCalendarPath ?? source.eduCalendarPath,
+    draftPath: patch.draftPath ?? source.draftPath,
+    finalPath: patch.finalPath ?? source.finalPath,
+    status: patch.status ?? source.status,
+    graphFiles: nextGraphFiles,
+    graphFileCount: patch.graphFileCount ?? source.graphFileCount,
+    materialDrafts: nextMaterialDrafts,
+    isSoftLoaded: patch.isSoftLoaded ?? source.isSoftLoaded,
+    isVisibleLoaded: patch.isVisibleLoaded ?? source.isVisibleLoaded,
+  };
+}
+
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 function getSyllabusProgress(status) {
   if (!status.isFinalMissing) return { label: '教学大纲就绪', tone: 'success' };
   if (!status.isDraftMissing) return { label: '已构建草稿', tone: 'warning' };
@@ -417,6 +512,10 @@ function BuildSyllabusModal({
   onSaveDraft,
   onGenerateFinal,
   onSaveFinal,
+<<<<<<< HEAD
+=======
+  onStepChange,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 }) {
   const finalEditorRef = useRef(null);
   const allowStep = (index) => {
@@ -432,7 +531,11 @@ function BuildSyllabusModal({
         steps={BUILD_STEPS}
         currentStep={state.step}
         allowStep={allowStep}
+<<<<<<< HEAD
         onSelect={(index) => allowStep(index) && setState((current) => ({ ...current, step: index }))}
+=======
+        onSelect={(index) => allowStep(index) && onStepChange(index)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
       />
 
       {state.step === 0 ? (
@@ -538,7 +641,11 @@ function BuildSyllabusModal({
               </Button>
               <Button
                 variant="ghost"
+<<<<<<< HEAD
                 onClick={() => setState((current) => ({ ...current, step: 2 }))}
+=======
+                onClick={() => onStepChange(2)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                 disabled={syllabus.status.isDraftMissing}
               >
                 修正草稿
@@ -580,7 +687,11 @@ function BuildSyllabusModal({
             <Button variant="primary" onClick={onSaveDraft}>保存</Button>
             <Button
               variant="secondary"
+<<<<<<< HEAD
               onClick={() => setState((current) => ({ ...current, step: 1 }))}
+=======
+              onClick={() => onStepChange(1)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
             >
               重新生成草稿
             </Button>
@@ -608,7 +719,11 @@ function BuildSyllabusModal({
               </Button>
               <Button
                 variant="ghost"
+<<<<<<< HEAD
                 onClick={() => setState((current) => ({ ...current, step: 4 }))}
+=======
+                onClick={() => onStepChange(4)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                 disabled={syllabus.status.isFinalMissing}
               >
                 修正终稿
@@ -655,7 +770,11 @@ function BuildSyllabusModal({
             <Button variant="primary" onClick={onSaveFinal}>保存</Button>
             <Button
               variant="secondary"
+<<<<<<< HEAD
               onClick={() => setState((current) => ({ ...current, step: 3 }))}
+=======
+              onClick={() => onStepChange(3)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
             >
               重新生成
             </Button>
@@ -687,6 +806,10 @@ function MaterialModal({
   onGenerateFinal,
   onSaveFinal,
   onPublish,
+<<<<<<< HEAD
+=======
+  onStepChange,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 }) {
   const selectedMaterial = syllabus.materialDrafts.find((item) => item.materialId === state.materialId) ?? null;
   const weekOptions = getMaterialWeekOptions(syllabus);
@@ -702,7 +825,11 @@ function MaterialModal({
         steps={MATERIAL_STEPS}
         currentStep={state.step}
         allowStep={allowStep}
+<<<<<<< HEAD
         onSelect={(index) => allowStep(index) && setState((current) => ({ ...current, step: index }))}
+=======
+        onSelect={(index) => allowStep(index) && onStepChange(index)}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
         />
 
       {selectedMaterial ? (
@@ -736,10 +863,19 @@ function MaterialModal({
                     onClick={() => setState((current) => ({
                       ...current,
                       materialId: item.materialId,
+<<<<<<< HEAD
                       draftTitle: item.draft?.material_title ?? item.title,
                       involvedWeeks: cloneData(item.draft?.involved_weeks ?? [4]),
                       draftQuestions: cloneData(item.draft?.questions ?? []),
                       finalQuestions: cloneData(item.finalData?.questions ?? []).map(hydrateFinalQuestion),
+=======
+                      draftTitle: item.title,
+                      involvedWeeks: [],
+                      draftQuestions: [],
+                      finalQuestions: [],
+                      isDraftJsonLoaded: Boolean(item.draft),
+                      isFinalJsonLoaded: Boolean(item.finalData),
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                     }))}
                   >
                     <span>{item.materialId}</span>
@@ -1016,6 +1152,13 @@ export default function TeacherDashboard({ navigate }) {
   const [materialModal, setMaterialModal] = useState({ open: false });
   const [materialUploadFiles, setMaterialUploadFiles] = useState([]);
   const [materialUploadBusy, setMaterialUploadBusy] = useState(false);
+<<<<<<< HEAD
+=======
+  const latestSyllabusesRef = useRef([]);
+  const latestActiveIdRef = useRef(null);
+  const latestBuildModalRef = useRef({ open: false });
+  const softRefreshBusyRef = useRef(false);
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
   const handleDownloadFile = async (item) => {
     if (!item?.fileId) {
@@ -1030,6 +1173,15 @@ export default function TeacherDashboard({ navigate }) {
   const [expandedTeacherWeekId, setExpandedTeacherWeekId] = useState(null);
 
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    latestSyllabusesRef.current = syllabuses;
+    latestActiveIdRef.current = activeId;
+    latestBuildModalRef.current = buildModal;
+  }, [syllabuses, activeId, buildModal]);
+
+  useEffect(() => {
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
     let cancelled = false;
 
     async function load() {
@@ -1046,13 +1198,25 @@ export default function TeacherDashboard({ navigate }) {
         const [bootstrap, graphs] = await Promise.all([getTeacherDashboardBootstrapData(), listGraphs()]);
         const firstSyllabusId = bootstrap.syllabuses[0]?.syllabusId ?? null;
         const firstSyllabus = bootstrap.syllabuses[0] ?? null;
+<<<<<<< HEAD
         const firstVisibleData = firstSyllabus ? await getTeacherSyllabusVisibleData(firstSyllabus) : null;
+=======
+        const firstSoftData = firstSyllabus ? await getTeacherSyllabusSoftRefreshData(firstSyllabus) : null;
+        const firstFinalData = firstSyllabusId && firstSoftData && !firstSoftData.status.isFinalMissing
+          ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(firstSyllabusId))
+          : null;
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
         if (!cancelled) {
           setSyllabuses(
             bootstrap.syllabuses.map((item) => (
+<<<<<<< HEAD
               item.syllabusId === firstSyllabusId && firstVisibleData
                 ? mergeSyllabusData(item, firstVisibleData)
+=======
+              item.syllabusId === firstSyllabusId && firstSoftData
+                ? mergeSyllabusData(mergeSoftSyllabusData(item, firstSoftData), { finalData: firstFinalData, isVisibleLoaded: Boolean(firstFinalData) })
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                 : item
             )),
           );
@@ -1083,12 +1247,17 @@ export default function TeacherDashboard({ navigate }) {
     }
 
     const target = syllabuses.find((item) => item.syllabusId === activeId);
+<<<<<<< HEAD
     if (!target || target.isVisibleLoaded) {
+=======
+    if (!target || target.isSoftLoaded) {
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
       return undefined;
     }
 
     let cancelled = false;
 
+<<<<<<< HEAD
     async function hydrateVisible() {
       try {
         const visibleData = await getTeacherSyllabusVisibleData(target);
@@ -1104,6 +1273,21 @@ export default function TeacherDashboard({ navigate }) {
     }
 
     hydrateVisible();
+=======
+    async function hydrateSoftData() {
+      try {
+        const softData = await getTeacherSyllabusSoftRefreshData(target);
+        if (cancelled) {
+          return;
+        }
+        patchSyllabusById(activeId, (item) => mergeSoftSyllabusData(item, softData));
+      } catch {
+        // Keep the shell usable even if light data hydration fails.
+      }
+    }
+
+    void hydrateSoftData();
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
     return () => {
       cancelled = true;
@@ -1116,12 +1300,17 @@ export default function TeacherDashboard({ navigate }) {
     }
 
     const target = syllabuses.find((item) => item.syllabusId === activeId);
+<<<<<<< HEAD
     if (!target || !target.isVisibleLoaded || target.isMaterialDetailsLoaded) {
+=======
+    if (!target || target.status.isFinalMissing || target.finalData) {
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
       return undefined;
     }
 
     let cancelled = false;
 
+<<<<<<< HEAD
     async function hydrateMaterialDetails() {
       try {
         const materialData = await getTeacherSyllabusMaterialDetails(target);
@@ -1135,12 +1324,130 @@ export default function TeacherDashboard({ navigate }) {
     }
 
     hydrateMaterialDetails();
+=======
+    async function hydrateOverviewData() {
+      try {
+        const finalData = parseSyllabusDetailResponse(await getSyllabusDetailRaw(target.syllabusId));
+        if (cancelled) {
+          return;
+        }
+        patchSyllabusById(activeId, (item) => mergeSyllabusData(item, { finalData, isVisibleLoaded: Boolean(finalData) }));
+      } catch {
+        // Keep the rest of the dashboard interactive.
+      }
+    }
+
+    void hydrateOverviewData();
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
     return () => {
       cancelled = true;
     };
   }, [activeId, syllabuses]);
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    if (isBooting) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function softRefresh() {
+      if (softRefreshBusyRef.current) {
+        return;
+      }
+
+      softRefreshBusyRef.current = true;
+
+      try {
+        const [bootstrap, graphs] = await Promise.all([getTeacherDashboardBootstrapData(), listGraphs()]);
+        if (cancelled) {
+          return;
+        }
+
+        const currentItems = latestSyllabusesRef.current;
+        const bootstrapItems = bootstrap.syllabuses.map((item) => {
+          const current = currentItems.find((existing) => existing.syllabusId === item.syllabusId);
+          return current ? mergeBootstrapSyllabus(current, item) : item;
+        });
+        const softPatches = await Promise.all(
+          bootstrapItems.map(async (item) => {
+            try {
+              return await getTeacherSyllabusSoftRefreshData(item);
+            } catch {
+              return null;
+            }
+          }),
+        );
+        if (cancelled) {
+          return;
+        }
+
+        setGraphOptions(graphs);
+        setSyllabuses((current) => {
+          const currentById = new Map(current.map((item) => [item.syllabusId, item]));
+
+          return bootstrap.syllabuses.map((base, index) => {
+            const existing = currentById.get(base.syllabusId);
+            const baseline = existing ? mergeBootstrapSyllabus(existing, base) : base;
+            const patch = softPatches[index];
+            return patch ? mergeSoftSyllabusData(baseline, patch) : baseline;
+          });
+        });
+        setActiveId(
+          bootstrap.syllabuses.some((item) => item.syllabusId === latestActiveIdRef.current)
+            ? latestActiveIdRef.current
+            : (bootstrap.syllabuses[0]?.syllabusId ?? null),
+        );
+
+        const currentBuildModal = latestBuildModalRef.current;
+        if (currentBuildModal.open && currentBuildModal.syllabus?.syllabusId != null) {
+          const targetIndex = bootstrap.syllabuses.findIndex(
+            (item) => item.syllabusId === currentBuildModal.syllabus.syllabusId,
+          );
+
+          if (targetIndex >= 0) {
+            const base = bootstrapItems[targetIndex];
+            const patch = softPatches[targetIndex];
+
+            setBuildModal((current) => {
+              if (!current.open || current.syllabus?.syllabusId !== base.syllabusId) {
+                return current;
+              }
+
+              const nextSyllabus = patch
+                ? mergeSoftSyllabusData(mergeBootstrapSyllabus(current.syllabus, base), patch)
+                : mergeBootstrapSyllabus(current.syllabus, base);
+
+              return {
+                ...current,
+                syllabus: nextSyllabus,
+              };
+            });
+          }
+        }
+      } catch {
+        // Soft refresh should not interrupt current interaction.
+      } finally {
+        softRefreshBusyRef.current = false;
+      }
+    }
+
+    void softRefresh();
+
+    const timer = window.setInterval(() => {
+      void softRefresh();
+    }, 20000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isBooting]);
+
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   const active = useMemo(
     () => syllabuses.find((item) => item.syllabusId === activeId) ?? syllabuses[0] ?? null,
     [activeId, syllabuses],
@@ -1171,7 +1478,12 @@ export default function TeacherDashboard({ navigate }) {
     [active?.materialDrafts],
   );
   const showTeacherShell = Boolean(active) || isBooting;
+<<<<<<< HEAD
   const isTeacherVisibleLoading = isBooting || Boolean(active && !active.isVisibleLoaded);
+=======
+  const isTeacherVisibleLoading = isBooting
+    || Boolean(active && (!active.isSoftLoaded || (!active.status.isFinalMissing && !active.finalData)));
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
 
   const patchActive = (updater) => {
     setSyllabuses((current) =>
@@ -1185,6 +1497,7 @@ export default function TeacherDashboard({ navigate }) {
     );
   };
 
+<<<<<<< HEAD
   const ensureBuildData = async (syllabus) => {
     if (!syllabus?.syllabusId || syllabus.isBuildLoaded) {
       return syllabus;
@@ -1205,6 +1518,134 @@ export default function TeacherDashboard({ navigate }) {
     const nextSyllabus = mergeSyllabusData(syllabus, materialData);
     patchSyllabusById(syllabus.syllabusId, (item) => mergeSyllabusData(item, materialData));
     return nextSyllabus;
+=======
+  const changeBuildStep = async (nextStep) => {
+    if (!buildTarget) {
+      return;
+    }
+
+    if (nextStep === 2 && buildTarget.syllabusId && !buildModal.isDraftJsonLoaded) {
+      setBuildModal((current) => ({ ...current, busy: 'load-draft-json' }));
+
+      try {
+        const draft = parseSyllabusDraftDetailResponse(await getSyllabusDraftDetailRaw(buildTarget.syllabusId));
+        patchSyllabusById(buildTarget.syllabusId, (item) => mergeSyllabusData(item, { draft, isBuildLoaded: true }));
+        setBuildModal((current) => ({
+          ...current,
+          syllabus: mergeSyllabusData(current.syllabus, { draft, isBuildLoaded: true }),
+          draftTitle: draft?.title ?? current.draftTitle,
+          draftDayOne: draft?.day_one ?? current.draftDayOne,
+          draftPeriod: draft?.period?.length ? cloneData(draft.period) : current.draftPeriod,
+          isDraftJsonLoaded: true,
+          busy: '',
+          step: nextStep,
+        }));
+      } catch (actionError) {
+        setBuildModal((current) => ({ ...current, busy: '' }));
+        setError(actionError instanceof Error ? actionError.message : '加载教学大纲草稿失败');
+      }
+
+      return;
+    }
+
+    if (nextStep === 4 && buildTarget.syllabusId && !buildModal.isFinalJsonLoaded) {
+      setBuildModal((current) => ({ ...current, busy: 'load-final-json' }));
+
+      try {
+        const finalData = parseSyllabusDetailResponse(await getSyllabusDetailRaw(buildTarget.syllabusId));
+        patchSyllabusById(buildTarget.syllabusId, (item) => mergeSyllabusData(item, { finalData, isBuildLoaded: true }));
+        setBuildModal((current) => ({
+          ...current,
+          syllabus: mergeSyllabusData(current.syllabus, { finalData, isBuildLoaded: true }),
+          finalTitle: finalData?.title ?? current.finalTitle,
+          finalDayOne: finalData?.day_one ?? current.finalDayOne,
+          finalPeriod: normalizeFinalPeriod(
+            finalData?.period ?? [],
+            current.draftPeriod,
+          ),
+          isFinalJsonLoaded: true,
+          busy: '',
+          step: nextStep,
+        }));
+      } catch (actionError) {
+        setBuildModal((current) => ({ ...current, busy: '' }));
+        setError(actionError instanceof Error ? actionError.message : '加载教学大纲终稿失败');
+      }
+
+      return;
+    }
+
+    setBuildModal((current) => ({ ...current, step: nextStep }));
+  };
+
+  const changeMaterialStep = async (nextStep) => {
+    const selectedMaterial = active?.materialDrafts.find((item) => item.materialId === materialModal.materialId) ?? null;
+    if (!selectedMaterial) {
+      setMaterialModal((current) => ({ ...current, step: nextStep }));
+      return;
+    }
+
+    if (nextStep === 1 && !materialModal.isDraftJsonLoaded) {
+      setMaterialModal((current) => ({ ...current, busy: 'load-material-draft' }));
+
+      try {
+        const draft = parseMaterialDraftResponse(await getMaterialDraftDetailRaw(selectedMaterial.materialId));
+        patchActive((item) => {
+          const target = item.materialDrafts.find((draftItem) => draftItem.materialId === selectedMaterial.materialId);
+          if (target) {
+            target.draft = draft;
+          }
+          return item;
+        });
+        setMaterialModal((current) => ({
+          ...current,
+          draftTitle: draft?.material_title ?? selectedMaterial.title,
+          involvedWeeks: cloneData(draft?.involved_weeks ?? current.involvedWeeks),
+          draftQuestions: cloneData(draft?.questions ?? []),
+          isDraftJsonLoaded: true,
+          busy: '',
+          step: nextStep,
+        }));
+      } catch (actionError) {
+        setMaterialModal((current) => ({ ...current, busy: '' }));
+        setError(actionError instanceof Error ? actionError.message : '加载习题草稿失败');
+      }
+
+      return;
+    }
+
+    if (nextStep === 3 && !materialModal.isFinalJsonLoaded) {
+      setMaterialModal((current) => ({ ...current, busy: 'load-material-final' }));
+
+      try {
+        const finalData = parseMaterialDetailResponse(await getMaterialDetailRaw(selectedMaterial.materialId));
+        const nextQuestions = cloneData(finalData?.questions ?? []).map(hydrateFinalQuestion);
+        patchActive((item) => {
+          const target = item.materialDrafts.find((draftItem) => draftItem.materialId === selectedMaterial.materialId);
+          if (target) {
+            target.finalData = finalData;
+          }
+          return item;
+        });
+        setMaterialModal((current) => ({
+          ...current,
+          draftTitle: finalData?.material_title ?? current.draftTitle,
+          involvedWeeks: cloneData(finalData?.involved_weeks ?? current.involvedWeeks),
+          finalQuestions: nextQuestions,
+          isFinalJsonLoaded: true,
+          busy: '',
+          step: nextStep,
+        }));
+      } catch (actionError) {
+        setMaterialModal((current) => ({ ...current, busy: '' }));
+        setError(actionError instanceof Error ? actionError.message : '加载习题终稿失败');
+      }
+
+      return;
+    }
+
+    setMaterialModal((current) => ({ ...current, step: nextStep }));
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
   };
 
   const switchSyllabus = (offset) => {
@@ -1301,6 +1742,7 @@ export default function TeacherDashboard({ navigate }) {
                       <div className="tile-actions">
                         <Button
                           variant="primary"
+<<<<<<< HEAD
                           onClick={async () => {
                             try {
                               const syllabusForBuild = await ensureBuildData(active);
@@ -1308,6 +1750,10 @@ export default function TeacherDashboard({ navigate }) {
                             } catch (actionError) {
                               setError(actionError instanceof Error ? actionError.message : '加载教学大纲详情失败');
                             }
+=======
+                          onClick={() => {
+                            setBuildModal(createBuildState(active, graphOptions));
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                           }}
                         >
                           {active.status.isFinalMissing ? '创建教学大纲' : '编辑教学大纲'}
@@ -1347,6 +1793,7 @@ export default function TeacherDashboard({ navigate }) {
                       <div className="tile-actions">
                         <Button
                           variant="primary"
+<<<<<<< HEAD
                           onClick={async () => {
                             try {
                               const syllabusForMaterial = await ensureMaterialDetails(active);
@@ -1354,6 +1801,10 @@ export default function TeacherDashboard({ navigate }) {
                             } catch (actionError) {
                               setError(actionError instanceof Error ? actionError.message : '加载习题详情失败');
                             }
+=======
+                          onClick={() => {
+                            setMaterialModal(createMaterialState(active));
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                           }}
                         >
                           打开弹窗
@@ -1496,6 +1947,10 @@ export default function TeacherDashboard({ navigate }) {
               const response = await uploadCalendar({
                 graphId: buildModal.selectedGraphId,
                 file: buildModal.calendarFiles[0],
+<<<<<<< HEAD
+=======
+                userId: getCurrentUserId(),
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
               });
               if (!response.success || !response.syllabusId) {
                 throw new Error(response.errorMessage || '上传失败');
@@ -1550,6 +2005,7 @@ export default function TeacherDashboard({ navigate }) {
                 syllabusId: buildTarget.syllabusId,
                 graphId: buildModal.selectedGraphId || buildTarget.graphId,
               });
+<<<<<<< HEAD
               patchSyllabusById(buildTarget.syllabusId, (item) => {
                 item.status.isDraftMissing = false;
                 item.draft = buildDraftJson(buildModal);
@@ -1573,6 +2029,46 @@ export default function TeacherDashboard({ navigate }) {
                 busy: '',
                 step: 2,
               }));
+=======
+              const refreshedBuildData = await getTeacherSyllabusBuildData({
+                ...cloneData(buildTarget),
+                graphId: buildModal.selectedGraphId || buildTarget.graphId,
+                graphName: buildModal.selectedGraphName || buildTarget.graphName,
+                status: {
+                  ...buildTarget.status,
+                  isDraftMissing: false,
+                },
+              });
+              const refreshedDraft = refreshedBuildData.draft ?? buildDraftJson(buildModal);
+
+              patchSyllabusById(buildTarget.syllabusId, (item) => mergeSyllabusData(item, {
+                ...refreshedBuildData,
+                graphId: buildModal.selectedGraphId || item.graphId,
+                graphName: buildModal.selectedGraphName || refreshedBuildData.graphName || item.graphName,
+                draft: refreshedDraft,
+              }));
+              setBuildModal((current) => {
+                const nextDraftPeriod = refreshedDraft?.period?.length
+                  ? cloneData(refreshedDraft.period)
+                  : current.draftPeriod;
+
+                return {
+                  ...current,
+                  syllabus: mergeSyllabusData(current.syllabus, {
+                    ...refreshedBuildData,
+                    graphId: current.selectedGraphId || current.syllabus.graphId,
+                    graphName: current.selectedGraphName || refreshedBuildData.graphName || current.syllabus.graphName,
+                    draft: refreshedDraft,
+                  }),
+                  draftTitle: refreshedDraft?.title ?? current.draftTitle,
+                  draftPeriod: nextDraftPeriod,
+                  finalPeriod: createFinalPeriodFromDraft(nextDraftPeriod),
+                  isDraftJsonLoaded: true,
+                  busy: '',
+                  step: 2,
+                };
+              });
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
             } catch (actionError) {
               setBuildModal((current) => ({ ...current, busy: '' }));
               setError(actionError instanceof Error ? actionError.message : '生成草稿失败');
@@ -1640,7 +2136,11 @@ export default function TeacherDashboard({ navigate }) {
                       ...current.syllabus.status,
                       isFinalMissing: false,
                     },
+<<<<<<< HEAD
                     finalData: {
+=======
+                  finalData: {
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                       title: current.draftTitle,
                       day_one: current.draftDayOne,
                       graph_name: selectedGraph?.graphName ?? current.syllabus.graphName ?? '',
@@ -1648,6 +2148,10 @@ export default function TeacherDashboard({ navigate }) {
                     },
                   },
                   finalPeriod: nextFinalPeriod,
+<<<<<<< HEAD
+=======
+                  isFinalJsonLoaded: true,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                   busy: '',
                   step: 4,
                 };
@@ -1682,6 +2186,10 @@ export default function TeacherDashboard({ navigate }) {
               setError(actionError instanceof Error ? actionError.message : '保存终稿失败');
             }
           }}
+<<<<<<< HEAD
+=======
+          onStepChange={changeBuildStep}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
         />
       ) : null}
 
@@ -1745,6 +2253,10 @@ export default function TeacherDashboard({ navigate }) {
                 involvedWeeks: cloneData(draft?.involved_weeks ?? current.involvedWeeks),
                 draftQuestions: cloneData(draft?.questions ?? []),
                 finalQuestions: [],
+<<<<<<< HEAD
+=======
+                isDraftJsonLoaded: true,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
               }));
             } catch (actionError) {
               setMaterialModal((current) => ({ ...current, busy: '' }));
@@ -1786,10 +2298,25 @@ export default function TeacherDashboard({ navigate }) {
             setError('');
             try {
               await generateFinalMaterial({ materialId: materialModal.materialId });
+<<<<<<< HEAD
               const nextQuestions = (
                 materialModal.finalQuestions.length
                   ? materialModal.finalQuestions
                   : cloneData(materialModal.draftQuestions)
+=======
+              const [finalResponse, statusResponse] = await Promise.all([
+                getMaterialDetailRaw(materialModal.materialId),
+                getMaterialStatusRaw(materialModal.materialId),
+              ]);
+              const finalData = parseMaterialDetailResponse(finalResponse);
+              const status = parseMaterialStatusResponse(statusResponse);
+              const nextQuestions = (
+                finalData?.questions?.length
+                  ? finalData.questions
+                  : (materialModal.finalQuestions.length
+                    ? materialModal.finalQuestions
+                    : cloneData(materialModal.draftQuestions))
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
               ).map(hydrateFinalQuestion);
 
               patchActive((item) => {
@@ -1797,8 +2324,13 @@ export default function TeacherDashboard({ navigate }) {
                   (draft) => draft.materialId === materialModal.materialId,
                 );
                 if (target) {
+<<<<<<< HEAD
                   target.status.isFinalMissing = false;
                   target.finalData = {
+=======
+                  target.status = status;
+                  target.finalData = finalData ?? {
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                     material_title: materialModal.draftTitle,
                     involved_weeks: cloneData(materialModal.involvedWeeks),
                     questions: cloneData(nextQuestions),
@@ -1810,7 +2342,14 @@ export default function TeacherDashboard({ navigate }) {
               setMaterialModal((current) => ({
                 ...current,
                 busy: '',
+<<<<<<< HEAD
                 finalQuestions: nextQuestions,
+=======
+                draftTitle: finalData?.material_title ?? current.draftTitle,
+                involvedWeeks: cloneData(finalData?.involved_weeks ?? current.involvedWeeks),
+                finalQuestions: nextQuestions,
+                isFinalJsonLoaded: true,
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
                 step: 3,
               }));
             } catch (actionError) {
@@ -1858,6 +2397,10 @@ export default function TeacherDashboard({ navigate }) {
               setError(actionError instanceof Error ? actionError.message : '发布失败');
             }
           }}
+<<<<<<< HEAD
+=======
+          onStepChange={changeMaterialStep}
+>>>>>>> 83d198c61b93a7aa346054799e632285dc416274
         />
       ) : null}
     </>
