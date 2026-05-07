@@ -62,4 +62,8 @@ export async function endJob(jobId) {
   return toMutationResult(await apiPost('/api/job_end', { job_id: jobId }));
 }
 
+export async function deleteJob(jobId) {
+  return toMutationResult(await apiPost('/api/job_delete', { job_id: jobId }));
+}
+
 export { parseJobListResponse, parseJobResponse };

@@ -489,7 +489,6 @@ function BuildSyllabusModal({
   onSaveFinal,
   onStepChange,
 }) {
-  const finalEditorRef = useRef(null);
   const allowStep = (index) => {
     if (index === 0) return true;
     if (index === 1) return !syllabus.status.isEduCalendarMissing;
@@ -1648,9 +1647,6 @@ export default function TeacherDashboard({ navigate }) {
               <article className="tile-card tile-slate tile-two-thirds">
                 <div className="tile-card-head">
                   <h3>教学材料</h3>
-                  <StatusPill tone={materialDisabled ? 'warning' : 'success'}>
-                    {`graph-file ${active?.graphFiles?.length ?? 0}`}
-                  </StatusPill>
                 </div>
                 {isTeacherVisibleLoading ? (
                   <>
@@ -1718,21 +1714,7 @@ export default function TeacherDashboard({ navigate }) {
                         </Button>
                       </div>
                     </div>
-                    <DisabledBlock disabled={materialDisabled} message="等待数据加载">
-                      <MaterialShelf
-                        items={(active.graphFiles ?? []).map((item) => ({
-                          ...item,
-                          onDownload: async (downloadItem) => {
-                            try {
-                              await handleDownloadFile(downloadItem);
-                            } catch (actionError) {
-                              setError(actionError instanceof Error ? actionError.message : '下载失败');
-                            }
-                          },
-                        }))}
-                        emptyText="暂无 graph-file。"
-                      />
-                    </DisabledBlock>
+                    <div />
                   </>
                 )}
               </article>

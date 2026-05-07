@@ -10,6 +10,7 @@ import {
 } from './mock_payloads';
 import { USE_MOCK_API, apiGet, apiPost, fileToUploadPayload } from './client';
 import { listGraphFiles, listSyllabusFiles } from './file_transmit_api';
+import { deleteJob } from './knowledge_build_api';
 import { getJobLabel, getJobTone, listJobs } from './job_api';
 import { requireUserId } from './session';
 
@@ -213,19 +214,25 @@ function ensureMaterialJson(value) {
 }
 
 function mapGraphFiles(graphFiles, jobs) {
-  return graphFiles.map((file) => {
-    const job = jobs.find((item) => item.fileId === file.fileId) ?? null;
+  return graphFiles
+    .map((file) => {
+      const job = jobs.find((item) => item.fileId === file.fileId) ?? null;
 
-    return {
-      fileId: file.fileId,
-      title: file.title,
-      source: file.source,
-      weekLabel: file.weekIndexList.length ? `第 ${file.weekIndexList.join(', ')} 周` : '',
-      tagText: job ? getJobLabel(job) : '',
-      tagTone: job ? getJobTone(job.status) : 'neutral',
-      job,
-    };
-  });
+      if (job?.status === 'failed') {
+        return null;
+      }
+
+      return {
+        fileId: file.fileId,
+        title: file.title,
+        source: file.source,
+        weekLabel: file.weekIndexList.length ? `第 ${file.weekIndexList.join(', ')} 周` : '',
+        tagText: job ? getJobLabel(job) : '',
+        tagTone: job ? getJobTone(job.status) : 'neutral',
+        job,
+      };
+    })
+    .filter(Boolean);
 }
 
 function mapMaterialShelf(syllabusFiles, graphFiles) {
@@ -300,7 +307,9 @@ async function buildTeacherSyllabusVisibleData(item) {
   const finalData = item.finalPath ? parseSyllabusDetailResponse(await getSyllabusDetailRaw(item.syllabusId)) : null;
   const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
   const jobs = item.graphId ? await listJobs(item.graphId) : [];
-  const graphFiles = mapGraphFiles(rawGraphFiles, jobs);
+  const failedJobs = jobs.filter((job) => job.status === 'failed');
+  await Promise.all(failedJobs.map((job) => deleteJob(job.jobId).catch(() => null)));
+  const graphFiles = mapGraphFiles(rawGraphFiles, jobs.filter((job) => job.status !== 'failed'));
   const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
   const materialStatuses = await Promise.all(
     materialList.map(async (material) => parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId))),
@@ -318,7 +327,7 @@ async function buildTeacherSyllabusVisibleData(item) {
     status,
     finalData,
     graphFiles,
-    graphFileCount: rawGraphFiles.length,
+    graphFileCount: graphFiles.length,
     materialDrafts,
     materialShelf: mapMaterialShelf([], graphFiles),
     isVisibleLoaded: true,
@@ -329,7 +338,9 @@ async function buildTeacherSyllabusSoftRefreshData(item) {
   const status = parseSyllabusStatusResponse(await getSyllabusStatusRaw(item.syllabusId));
   const rawGraphFiles = await listGraphFiles(item.graphId ? [item.graphId] : []);
   const jobs = item.graphId ? await listJobs(item.graphId) : [];
-  const graphFiles = mapGraphFiles(rawGraphFiles, jobs);
+  const failedJobs = jobs.filter((job) => job.status === 'failed');
+  await Promise.all(failedJobs.map((job) => deleteJob(job.jobId).catch(() => null)));
+  const graphFiles = mapGraphFiles(rawGraphFiles, jobs.filter((job) => job.status !== 'failed'));
   const materialList = parseMaterialListResponse(await listMaterialsRaw(item.syllabusId));
   const materialStatuses = await Promise.all(
     materialList.map(async (material) => parseMaterialStatusResponse(await getMaterialStatusRaw(material.materialId))),
@@ -352,7 +363,7 @@ async function buildTeacherSyllabusSoftRefreshData(item) {
     finalPath: item.finalPath ?? null,
     status,
     graphFiles,
-    graphFileCount: rawGraphFiles.length,
+    graphFileCount: graphFiles.length,
     materialDrafts,
     isSoftLoaded: true,
   };

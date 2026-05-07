@@ -92,12 +92,39 @@ function FileDropzone({ files, onFilesChange, title = '选择文件 / dropbox' }
   );
 }
 
-function toProfileEntries(knowledgeMastery) {
-  if (!knowledgeMastery || typeof knowledgeMastery !== 'object') {
-    return [];
-  }
+const DEFAULT_PROFILE_METRICS = [
+  { key: 'overall_score', label: 'overall_score' },
+  { key: 'answer_score', label: 'answer_score' },
+  { key: 'syllabus_score', label: 'syllabus_score' },
+  { key: 'engagement_score', label: 'engagement_score' },
+  { key: 'mastered_weeks', label: 'mastered_weeks' },
+  { key: 'overall_level', label: 'overall_level' },
+  { key: 'by_knowledge_point', label: 'by_knowledge_point' },
+  { key: 'knowledge_point_details', label: 'knowledge_point_details' },
+];
 
-  return Object.entries(knowledgeMastery).slice(0, 8);
+function createEmptyLearningProfile(userId = null, syllabusId = null) {
+  return {
+    user_id: userId,
+    syllabus_id: syllabusId,
+    learning_goal: null,
+    target_level: null,
+    learning_style: null,
+    study_frequency: null,
+    study_duration: null,
+    bottleneck_topics: [],
+    dropout_risk: null,
+    knowledge_mastery: {
+      overall_score: 0,
+      answer_score: 0,
+      syllabus_score: 0,
+      engagement_score: 0,
+      mastered_weeks: 0,
+      overall_level: 0,
+      by_knowledge_point: 0,
+      knowledge_point_details: 0,
+    },
+  };
 }
 
 export default function StudentDashboard({ navigate }) {
@@ -105,7 +132,7 @@ export default function StudentDashboard({ navigate }) {
   const [activeId, setActiveId] = useState(null);
   const [isBooting, setIsBooting] = useState(true);
   const [error, setError] = useState('');
-  const [learningProfile, setLearningProfile] = useState(null);
+  const [learningProfile, setLearningProfile] = useState(() => createEmptyLearningProfile());
   const [dialogueTextForProfile, setDialogueTextForProfile] = useState('');
   const [advancedJsonText, setAdvancedJsonText] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
@@ -141,16 +168,6 @@ export default function StudentDashboard({ navigate }) {
         }
         setSyllabuses(response.syllabuses);
         setActiveId(response.syllabuses[0]?.syllabusId ?? null);
-        try {
-          const profileRes = await getLearningProfile({
-            syllabusId: response.syllabuses[0]?.syllabusId ?? null,
-          });
-          if (!cancelled && profileRes?.success) {
-            setLearningProfile(profileRes.profile ?? null);
-          }
-        } catch {
-          // Keep dashboard boot resilient if profile loading fails.
-        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '加载失败');
@@ -168,6 +185,45 @@ export default function StudentDashboard({ navigate }) {
       cancelled = true;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    if (!activeId || isBooting) {
+      return undefined;
+    }
+
+    const activeSyllabus = syllabuses.find((item) => item.syllabusId === activeId) ?? null;
+    if (!activeSyllabus) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const fallbackProfile = createEmptyLearningProfile(getCurrentUserId(), activeSyllabus.syllabusId);
+
+    setLearningProfile(fallbackProfile);
+
+    async function loadLearningProfile() {
+      try {
+        const profileRes = await getLearningProfile({
+          syllabusId: activeSyllabus.syllabusId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setLearningProfile(profileRes?.profile ?? fallbackProfile);
+      } catch {
+        if (!cancelled) {
+          setLearningProfile(fallbackProfile);
+        }
+      }
+    }
+
+    void loadLearningProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, isBooting, syllabuses]);
 
   const active = syllabuses.find((item) => item.syllabusId === activeId) ?? syllabuses[0] ?? null;
   const weekOptions = useMemo(() => active?.personalSyllabus?.period ?? [], [active?.personalSyllabus]);
@@ -307,8 +363,8 @@ export default function StudentDashboard({ navigate }) {
           >
             <div className="tile-card-head">
               <h3>Learning Profile</h3>
-              <StatusPill tone={learningProfile ? 'success' : 'neutral'}>
-                {learningProfile ? 'loaded' : 'not loaded'}
+              <StatusPill tone="success">
+                loaded
               </StatusPill>
             </div>
 
@@ -362,9 +418,10 @@ export default function StudentDashboard({ navigate }) {
                           throw new Error(response?.errorMessage || 'Learning profile request failed.');
                         }
 
-                        setLearningProfile(response.profile ?? null);
+                        setLearningProfile(response.profile ?? createEmptyLearningProfile(getCurrentUserId(), active.syllabusId));
                       } catch (actionError) {
                         setError(actionError instanceof Error ? actionError.message : 'Learning profile request failed.');
+                        setLearningProfile(createEmptyLearningProfile(getCurrentUserId(), active.syllabusId));
                       } finally {
                         setProfileLoading(false);
                       }
@@ -406,23 +463,23 @@ export default function StudentDashboard({ navigate }) {
 
                 <div style={{ flex: '1 1 360px', minWidth: 300, display: 'grid', gap: 8 }}>
                   <strong>Knowledge mastery</strong>
-                  {toProfileEntries(learningProfile.knowledge_mastery).length ? (
-                    toProfileEntries(learningProfile.knowledge_mastery).map(([topic, value]) => {
-                      const score = Number(value) || 0;
-                      const percent = Math.max(0, Math.min(100, Math.round(score * 100)));
-                      return (
-                        <div key={topic} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 48px', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 13 }}>{topic}</span>
-                          <div style={{ height: 10, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-                            <div style={{ width: `${percent}%`, height: '100%', background: '#0f766e' }} />
-                          </div>
-                          <span style={{ fontSize: 12, textAlign: 'right' }}>{percent}%</span>
+                  {DEFAULT_PROFILE_METRICS.map((metric) => {
+                    const rawValue = learningProfile.knowledge_mastery?.[metric.key] ?? 0;
+                    const numericValue = Number(rawValue);
+                    const percent = Number.isFinite(numericValue)
+                      ? Math.max(0, Math.min(100, Math.round(numericValue * 100)))
+                      : 0;
+
+                    return (
+                      <div key={metric.key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 48px', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 13 }}>{metric.label}</span>
+                        <div style={{ height: 10, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+                          <div style={{ width: `${percent}%`, height: '100%', background: '#0f766e' }} />
                         </div>
-                      );
-                    })
-                  ) : (
-                    <EmptyState>No knowledge mastery data.</EmptyState>
-                  )}
+                        <span style={{ fontSize: 12, textAlign: 'right' }}>{percent}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
